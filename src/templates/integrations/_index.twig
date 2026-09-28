@@ -6,6 +6,8 @@
     { label: 'Formable'|t('formable'), url: cpUrl('formable') },
 ] %}
 
+{% set typeNames = types|reduce((carry, type) => carry|merge({ (type.type): type.name }), {}) %}
+
 {% set categoryLabels = {
     emailMarketing: 'Email marketing'|t('formable'),
     crm: 'CRM'|t('formable'),
@@ -60,9 +62,8 @@
                     <tr data-id="{{ integration.id }}">
                         <th scope="row" data-title="{{ 'Name'|t('formable') }}">
                             <a href="{{ cpUrl('formable/integrations/' ~ integration.id) }}">{{ integration.name }}</a>
-                            <span class="light code">{{ integration.handle }}</span>
                         </th>
-                        <td data-title="{{ 'Type'|t('formable') }}">{{ integration.type }}</td>
+                        <td data-title="{{ 'Type'|t('formable') }}">{{ typeNames[integration.type] ?? integration.type }}</td>
                         <td data-title="{{ 'Enabled'|t('formable') }}">
                             {% if integration.enabled %}
                                 <span class="status green"></span>{{ 'Enabled'|t('formable') }}

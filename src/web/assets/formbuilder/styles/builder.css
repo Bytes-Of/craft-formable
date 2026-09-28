@@ -949,12 +949,23 @@
   font-size: 13px;
 }
 
+/* A select is as wide as its longest option, so a long field label ("Which
+   funding themes does this project address?") took the row and squeezed an
+   option-picking value down to "Major - £'", with the remove button wrapped
+   onto a line of its own. The field select may shrink; the value gets the
+   larger share, since it's the half an author has to read to check the rule. */
+.fb-conditions__rule > .fb-conditions__select:first-child {
+  flex: 1 1 9rem;
+  min-width: 0;
+}
+
 .fb-conditions__value {
-  flex: 1 1 6rem;
-  min-width: 5rem;
+  flex: 2 1 11rem;
+  min-width: 7rem;
 }
 
 .fb-conditions__remove {
+  flex: none;
   margin-left: auto;
   width: 24px;
   height: 24px;

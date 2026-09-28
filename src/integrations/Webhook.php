@@ -117,6 +117,7 @@ final class Webhook extends Integration
                 'dateCreated' => $submission->dateCreated?->format(DATE_ATOM),
             ],
             'data' => $this->submissionData($submission),
+            'raw' => $this->submissionRaw($submission),
         ];
 
         $headers = ['Accept' => 'application/json'];
@@ -134,6 +135,7 @@ final class Webhook extends Integration
     /**
      * The submission's values keyed by field handle, each rendered to a plain
      * string so the payload is stable regardless of a field's internal shape.
+     * These are display strings: an options field sends the option's label.
      *
      * @return array<string, string>
      */
@@ -144,6 +146,26 @@ final class Webhook extends Integration
         foreach ($submission->getFormFields() as $handle => $field) {
             if ($field::hasValue()) {
                 $data[$handle] = $field->valueToString($submission->getValue($handle));
+            }
+        }
+
+        return $data;
+    }
+
+    /**
+     * The same values in their stored form, so a receiver can branch on an
+     * option's value rather than on a label an author is free to reword.
+     * GraphQL draws the same line between `fieldValues` and `valuesJson`.
+     *
+     * @return array<string, mixed>
+     */
+    private function submissionRaw(Submission $submission): array
+    {
+        $data = [];
+
+        foreach ($submission->getFormFields() as $handle => $field) {
+            if ($field::hasValue()) {
+                $data[$handle] = $field->serializeValue($submission->getValue($handle));
             }
         }
 

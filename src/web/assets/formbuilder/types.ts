@@ -338,6 +338,10 @@ export interface ConditionOperator {
 export interface ConditionsConfig {
   operators: ConditionOperator[];
   actions: SelectOption[];
+  /** The same show/hide values worded for a notification's send decision. */
+  notificationActions: SelectOption[];
+  /** The same show/hide values worded for an integration's forward decision. */
+  integrationActions: SelectOption[];
   matches: SelectOption[];
 }
 

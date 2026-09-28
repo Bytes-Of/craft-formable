@@ -718,6 +718,12 @@ Also multiples of `--formable-unit`.
 | `--formable-control-height`      | `--formable-unit × 10`   | `2.5rem`   |
 | `--formable-control-padding-x`   | `--formable-unit × 2.5`  | `0.625rem` |
 | `--formable-control-padding-y`   | `--formable-unit × 2`    | `0.5rem`   |
+| `--formable-check-size`          | -                        | `1em`      |
+
+`--formable-check-size` sets the width and height of a checkbox or radio
+button. It has no declaration of its own, so leaving it unset keeps each box
+at the size of its label's text. The box stays centred on the label's first
+line whatever the size or the line height.
 
 A form set to **Compact** in its settings carries `formable-form--compact`,
 which redefines the three tokens above (to `--formable-unit × 9` / `× 2` /

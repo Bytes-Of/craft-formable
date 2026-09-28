@@ -36,16 +36,16 @@ final class Name extends CompositeFormField
                 'autocomplete' => 'honorific-prefix',
             ],
             'firstName' => [
-                'label' => Craft::t('formable', 'First Name'),
+                'label' => Craft::t('formable', 'First name'),
                 'autocomplete' => 'given-name',
             ],
             'middleName' => [
-                'label' => Craft::t('formable', 'Middle Name'),
+                'label' => Craft::t('formable', 'Middle name'),
                 'enabled' => false,
                 'autocomplete' => 'additional-name',
             ],
             'lastName' => [
-                'label' => Craft::t('formable', 'Last Name'),
+                'label' => Craft::t('formable', 'Last name'),
                 'autocomplete' => 'family-name',
             ],
         ];

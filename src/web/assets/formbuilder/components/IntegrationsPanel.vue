@@ -315,6 +315,7 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
             </p>
             <ConditionsEditor
               :model-value="config(selected.handle).conditions"
+              :actions="store.config?.conditions.integrationActions"
               @update:model-value="updateConditions(selected.handle, $event)"
             />
           </div>

@@ -39,6 +39,7 @@ return [
     'CC',
     'Checkbox',
     'Choose which form field fills each target. Leave a target unmapped to skip it.',
+    'Choose…',
     'Close',
     'Column {number} choices',
     'Column {number} handle',

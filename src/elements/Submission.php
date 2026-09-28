@@ -219,13 +219,13 @@ final class Submission extends Element
                 // No isSpam criterion needed: the query hides spam by default,
                 // so this source shows only the legitimate submissions.
                 'criteria' => [],
-                'defaultSort' => ['formable_submissions.dateCreated', 'desc'],
+                'defaultSort' => ['dateCreated', 'desc'],
             ],
             [
                 'key' => 'spam',
                 'label' => Craft::t('formable', 'Spam'),
                 'criteria' => ['isSpam' => true],
-                'defaultSort' => ['formable_submissions.dateCreated', 'desc'],
+                'defaultSort' => ['dateCreated', 'desc'],
             ],
         ];
 
@@ -240,7 +240,7 @@ final class Submission extends Element
                 'key' => "form:$form->id",
                 'label' => (string)$form->title,
                 'criteria' => ['formId' => $form->id],
-                'defaultSort' => ['formable_submissions.dateCreated', 'desc'],
+                'defaultSort' => ['dateCreated', 'desc'],
                 'data' => ['handle' => (string)$form->handle],
             ];
         }

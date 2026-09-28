@@ -192,6 +192,49 @@ abstract class OptionsFormField extends FormField
         return is_scalar($value) ? (string)$value : null;
     }
 
+    /**
+     * Answers are stored as option values, but everywhere a value is
+     * stringified it is on its way to a person - the review step, the
+     * submission title, an export, a notification, an integration - so it
+     * renders the label the author wrote rather than the machine value.
+     *
+     * A value with no matching option falls back to itself. An option removed
+     * after a submission was taken would otherwise erase that answer from the
+     * record, which is worse than showing its stored value.
+     */
+    public function valueToString(mixed $value): string
+    {
+        if ($value === null || $value === '') {
+            return '';
+        }
+
+        $labels = [];
+
+        foreach ($this->_options as $option) {
+            $labels[$option->getValue()] = $option->label !== ''
+                ? $option->label
+                : $option->getValue();
+        }
+
+        $parts = [];
+
+        foreach (is_array($value) ? $value : [$value] as $item) {
+            if (!is_scalar($item)) {
+                continue;
+            }
+
+            $item = (string)$item;
+
+            if ($item === '') {
+                continue;
+            }
+
+            $parts[] = $labels[$item] ?? $item;
+        }
+
+        return implode(', ', $parts);
+    }
+
     public function getDefaultValue(): mixed
     {
         $defaults = array_values(array_map(

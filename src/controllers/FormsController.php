@@ -540,6 +540,17 @@ final class FormsController extends Controller
                     ['value' => ConditionSet::ACTION_SHOW, 'label' => Craft::t('formable', 'Show')],
                     ['value' => ConditionSet::ACTION_HIDE, 'label' => Craft::t('formable', 'Hide')],
                 ],
+                // A notification and an integration store the same show/hide
+                // pair, but nothing is being shown - the set decides whether
+                // the thing is sent at all, so it says so in the author's words.
+                'notificationActions' => [
+                    ['value' => ConditionSet::ACTION_SHOW, 'label' => Craft::t('formable', 'Send')],
+                    ['value' => ConditionSet::ACTION_HIDE, 'label' => Craft::t('formable', 'Don’t send')],
+                ],
+                'integrationActions' => [
+                    ['value' => ConditionSet::ACTION_SHOW, 'label' => Craft::t('formable', 'Forward')],
+                    ['value' => ConditionSet::ACTION_HIDE, 'label' => Craft::t('formable', 'Don’t forward')],
+                ],
                 'matches' => [
                     ['value' => ConditionSet::MATCH_ALL, 'label' => Craft::t('formable', 'all')],
                     ['value' => ConditionSet::MATCH_ANY, 'label' => Craft::t('formable', 'any')],

@@ -5,6 +5,7 @@ import {
   emptyConditionSet,
   type ConditionRule,
   type ConditionSet,
+  type SelectOption,
 } from '../types';
 import { t } from '../helpers';
 import UpgradePrompt from './UpgradePrompt.vue';
@@ -21,6 +22,13 @@ const props = defineProps<{
   modelValue: ConditionSet | undefined;
   /** The field this set belongs to, so it can't reference itself. */
   ownFieldId?: string;
+  /**
+   * Wording for the stored show/hide actions. A notification or an integration
+   * passes its own pair - nothing is shown or hidden there, the set decides
+   * whether the thing is sent - and leaving it out gives the show/hide pair a
+   * field or page wants.
+   */
+  actions?: SelectOption[];
 }>();
 
 const emit = defineEmits<{
@@ -52,6 +60,53 @@ const fieldOptions = computed(() =>
       label: field.label || field.handle,
     })),
 );
+
+const actionOptions = computed<SelectOption[]>(
+  () => props.actions ?? conditionsConfig.value?.actions ?? [],
+);
+
+/** Mirrors the option rows {@see OptionsControl} edits. */
+interface FieldOptionConfig {
+  label: string;
+  value: string;
+}
+
+/**
+ * The values the field a rule tests can actually hold, when it is an options
+ * field. Typing one by hand is how an author ends up with a rule that silently
+ * never matches, so the comparison value is picked from the same list the
+ * submitter sees.
+ */
+function valueOptions(rule: ConditionRule): SelectOption[] | null {
+  const field = store.allFields.find((f) => f.handle === rule.field);
+  const options = field?.options;
+
+  if (!Array.isArray(options)) {
+    return null;
+  }
+
+  const resolved = (options as Partial<FieldOptionConfig>[])
+    .map((option) => {
+      // Mirrors FieldOption::getValue() - an option authored with a label
+      // alone is stored under that label.
+      const value = option.value || option.label || '';
+
+      return { value, label: option.label || value };
+    })
+    .filter((option) => option.value !== '');
+
+  if (rule.value === '') {
+    return [{ value: '', label: t('Choose…') }, ...resolved];
+  }
+
+  // A rule written against an option that has since been renamed or removed
+  // keeps its value rather than being silently rewritten to the first one.
+  if (!resolved.some((option) => option.value === rule.value)) {
+    return [...resolved, { value: rule.value, label: rule.value }];
+  }
+
+  return resolved;
+}
 
 function operatorIsUnary(operator: string): boolean {
   return (
@@ -122,7 +177,7 @@ function removeRule(index: number): void {
             "
           >
             <option
-              v-for="a in conditionsConfig?.actions ?? []"
+              v-for="a in actionOptions"
               :key="String(a.value)"
               :value="a.value"
             >
@@ -186,18 +241,39 @@ function removeRule(index: number): void {
               </option>
             </select>
 
-            <input
-              v-if="!operatorIsUnary(rule.operator)"
-              type="text"
-              class="fb-conditions__value"
-              :value="rule.value"
-              :placeholder="t('value')"
-              @input="
-                updateRule(index, {
-                  value: ($event.target as HTMLInputElement).value,
-                })
-              "
-            />
+            <template v-if="!operatorIsUnary(rule.operator)">
+              <select
+                v-if="valueOptions(rule)"
+                class="fb-conditions__select fb-conditions__value"
+                :value="rule.value"
+                @change="
+                  updateRule(index, {
+                    value: ($event.target as HTMLSelectElement).value,
+                  })
+                "
+              >
+                <option
+                  v-for="o in valueOptions(rule) ?? []"
+                  :key="o.value === '' ? '__placeholder' : String(o.value)"
+                  :value="o.value"
+                >
+                  {{ o.label }}
+                </option>
+              </select>
+
+              <input
+                v-else
+                type="text"
+                class="fb-conditions__value"
+                :value="rule.value"
+                :placeholder="t('value')"
+                @input="
+                  updateRule(index, {
+                    value: ($event.target as HTMLInputElement).value,
+                  })
+                "
+              />
+            </template>
 
             <button
               type="button"

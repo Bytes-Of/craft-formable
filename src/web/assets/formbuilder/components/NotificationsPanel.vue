@@ -409,6 +409,7 @@ function fieldError(name: string): string | null {
         </p>
         <ConditionsEditor
           :model-value="selected.conditions"
+          :actions="store.config?.conditions.notificationActions"
           @update:model-value="updateConditions"
         />
       </div>

@@ -35,7 +35,7 @@ final class Address extends CompositeFormField
                 'autocomplete' => 'address-line1',
             ],
             'address2' => [
-                'label' => Craft::t('formable', 'Address Line 2'),
+                'label' => Craft::t('formable', 'Address line 2'),
                 'enabled' => false,
                 'autocomplete' => 'address-line2',
             ],
@@ -44,11 +44,11 @@ final class Address extends CompositeFormField
                 'autocomplete' => 'address-level2',
             ],
             'state' => [
-                'label' => Craft::t('formable', 'State / Region'),
+                'label' => Craft::t('formable', 'State / region'),
                 'autocomplete' => 'address-level1',
             ],
             'zip' => [
-                'label' => Craft::t('formable', 'ZIP / Postal Code'),
+                'label' => Craft::t('formable', 'ZIP / postal code'),
                 'autocomplete' => 'postal-code',
             ],
             'country' => [

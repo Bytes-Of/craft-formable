@@ -1,12 +1,18 @@
 # Release Notes for Formable
 
-## 1.0.0-beta.1 - 2026-09-28
+## 1.0.0-beta.2 - 2026-09-28
 
-A beta of 1.0.0, for trying Formable on real sites before the final release. Please report anything that goes wrong at https://github.com/Bytes-Of/craft-formable/issues.
+The second beta of 1.0.0, for trying Formable on real sites before the final release. Since the first beta, Dropdown, Radio Buttons, Checkboxes and Multi-select answers show their option labels instead of their stored values, and there are smaller fixes to the form builder and the default theme, all listed below. Please report anything that goes wrong at https://github.com/Bytes-Of/craft-formable/issues.
 
 This is Formable’s first release, for Craft CMS 5.10.7 or later. Pre-release builds were used to develop it, so **Changed** and **Fixed** record where 1.0.0 differs from those, for anyone who installed one. On a fresh install, everything below is simply how Formable behaves.
 
 ### Added
+
+- **Webhooks also send each answer as it’s stored.** The payload’s `data` object holds answers as people read them, and a new `raw` object holds the stored values. So a receiver can branch on an option’s value, which stays put when an author rewords its label. The payload is described in [Notifications & integrations](docs/notifications-integrations.md#what-a-webhook-sends).
+
+- **Conditions on an options field pick their value from a list.** When a rule tests a Dropdown, Radio Buttons, Checkboxes or Multi-select field, the builder offers that field’s options instead of a text box, so a rule can no longer silently fail to match because of a typo. A rule written against an option that has since been removed keeps its value.
+
+- **A `--formable-check-size` token** sets the size of checkboxes and radio buttons. Left unset, each box matches its label’s text size. See [Theming](docs/theming.md#control-density).
 
 - A stability policy for people building on Formable. Every PHP class is now marked `@api` (stable) or `@internal` (free to change in any release), and the new [API stability](docs/api-stability.md) page lists what is stable - the field, integration and preset base classes, the submission events, forms and submissions and their queries, the `craft.formable` Twig variable, the front-end JavaScript entry points and DOM events, the console commands, the GraphQL schema and the form export format - along with what counts as a breaking change and how deprecations are handled. The extending guide no longer suggests custom captchas, since there is no way to register one.
 
@@ -152,6 +158,14 @@ This is Formable’s first release, for Craft CMS 5.10.7 or later. Pre-release b
 
 ### Changed
 
+- **Dropdown, Radio Buttons, Checkboxes and Multi-select answers now show the option’s label, not its stored value.** This applies everywhere an answer is displayed: the submitter’s review step, submission titles and search, CSV exports, notification emails, Slack, Mailchimp, HubSpot, the webhook’s `data` object, GraphQL’s `value` field and the edit history. If an option has been removed since a submission came in, its stored value is shown instead. Conditional logic still compares stored values, so rewording an option’s label never changes which rules match.
+
+- **Conditions on notifications and integrations read as what they do.** They used to offer **Show** and **Hide**, like a field’s conditions. A notification now offers **Send** and **Don’t send**, and an integration offers **Forward** and **Don’t forward**. The rules and the stored settings are unchanged.
+
+- **Name and Address sub-field labels are sentence case**, like every other label: “First name”, “Middle name”, “Last name”, “Address line 2”, “State / region” and “ZIP / postal code”. A form using the default labels picks up the new wording, and a label an author has changed is left alone. If your site translates Formable’s strings, update those six keys.
+
+- **The Integrations list names each integration’s type properly** (“Mailchimp” instead of `mailchimp`), and no longer prints the handle beside the name.
+
 - **Formable is now published as `bytesof/craft-formable`, and its PHP namespace is `bytesof\formable`.** The `vivid` vendor name the pre-release builds used belongs to an unrelated publisher on Packagist, so the plugin could not be released under it. If you installed a pre-release build, switch the requirement over with `composer require bytesof/craft-formable` (removing the old `vivid/craft-formable` line) and then run `php craft up`. An update migration rewrites the old class names everywhere they were stored - your forms, submissions, field layouts, dashboard widgets and any queued notification or integration jobs all carry over untouched, and nothing needs rebuilding by hand. A form exported from a pre-release build still imports correctly: its fields are recognized under either namespace. Anyone extending Formable in their own code - a custom field, integration or preset, or an event handler - needs to update their `use` statements to `bytesof\formable\…`; the class and method names themselves are unchanged.
 
 - **Submission lists stay fast on large sites.** A form's submissions in the control panel, the “Recent Form Submissions” widget, the weekly digest and the submission-limit check now sort and filter through indexes built for exactly those queries. With a million stored submissions, opening a busy form's submissions went from about two seconds to a few milliseconds, and checking a form's submission limit no longer counts its whole history on every page view. The update adds two database indexes to the submissions table, which takes under a minute even on a very large table.
@@ -213,6 +227,12 @@ This is Formable’s first release, for Craft CMS 5.10.7 or later. Pre-release b
 - A rendered form's step title now stands clearly above an in-page **Heading** field, where the two were nearly the same size before. The step title moves up to `1.5rem` (a new `--formable-font-size-2xl` token), and both it and the heading now paint at the theme's own semibold weight rather than the browser's heavier default. Field labels and instruction text get a `1.5rem` line-height of their own (`--formable-line-height-normal`, reinstated) so a label or hint that wraps to two lines keeps its spacing regardless of the host page's body leading. **If you override `--formable-font-size-xl` to size the step title**, move that override to `--formable-font-size-2xl`; `-xl` is now only the resume page's body-copy rung.
 
 ### Fixed
+
+- **Checkboxes and radio buttons line up with their labels.** They sat a couple of pixels above the text on any page with a line height above the browser default, which is most sites. They’re now centred on the label’s first line whatever the page’s line height or font size.
+
+- **Submission lists open newest first.** Every submission list, including **All submissions** and **Spam**, was meant to sort by date created, newest first, but opened in the order submissions were saved until you clicked the column header.
+
+- **A condition’s value is readable in the notification and integration panels.** A long field name used to squeeze the value down to a few characters and push the remove button onto its own line.
 
 - **A form whose handle was reused while it sat in the trash can be restored again.** Formable lets a new form take the handle of a trashed one, but restoring the trashed form then failed with nothing more than “Forms not restored.” It now comes back under the next free variant of its handle - `contact2`, `contact3` and so on - and the live form keeps the original, which is the one your templates already use. Rename either in the builder if you want them the other way round.
 

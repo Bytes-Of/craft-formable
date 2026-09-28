@@ -502,9 +502,28 @@
     cursor: not-allowed;
   }
 
+  /* Centre the box on the first line of the label. The `0.2em` this replaces
+     was measured against one line-height and only landed there: a host page
+     setting `line-height: 1.6` - which most do - pushed the box 2.3px above
+     the text it belongs to. Deriving the offset from `1lh` tracks whatever
+     line-height the box actually inherits.
+
+     That calc needs a known box height, so the native ~13px size is pinned to
+     `1em` instead. Sizing it in `em` also keeps the box proportional to a host
+     whose font-size differs, which the native size never was. `lh` is already
+     load-bearing in this stylesheet (`.formable-input--textarea` above). */
   .formable-option .formable-input--checkbox,
   .formable-option .formable-input--radio {
-    margin-block-start: 0.2em;
+    /* Both units below have to resolve against the label's text, and a form
+       control carries the UA's own ~13.3px font until something says
+       otherwise. `formable-theme.css` already gives every `.formable-input`
+       `font: inherit`; this repeats it for the two that need it so a
+       reset-only site gets the same geometry rather than a near miss. */
+    font: inherit;
+    box-sizing: border-box;
+    inline-size: var(--formable-check-size, 1em);
+    block-size: var(--formable-check-size, 1em);
+    margin-block-start: calc((1lh - var(--formable-check-size, 1em)) / 2);
     flex-shrink: 0;
   }
 

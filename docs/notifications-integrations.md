@@ -130,6 +130,27 @@ included in form exports (see [import-export.md](import-export.md)).
 configured, needs the **Manage integrations** permission - it does not require
 an admin account. See [Permissions](permissions.md).
 
+### What a webhook sends
+
+The request body is JSON:
+
+```json
+{
+  "form": { "id": 12, "handle": "grantApplication", "title": "Community Grants Programme 2026" },
+  "submission": { "id": 4821, "dateCreated": "2026-09-24T10:14:00+01:00" },
+  "data": { "orgName": "Ashcombe Angling Club", "grantTier": "Major - £10,001 to £25,000" },
+  "raw": { "orgName": "Ashcombe Angling Club", "grantTier": "major" }
+}
+```
+
+`data` holds each answer as the text a person would read. A Dropdown, Radio
+Buttons, Checkboxes or Multi-select answer is the option's **label**, the same
+text the submission, the CSV export and notifications show. `raw` holds the
+same answers as they're stored, so an option answer is its **value**. Branch
+on `raw` when the receiver makes decisions: an author can reword a label at any
+time, but the value stays put. Every other integration and notification uses
+the labels.
+
 ### Where integrations may send
 
 An integration only calls **public** addresses. A URL whose host resolves to a
