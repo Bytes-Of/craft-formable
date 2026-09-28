@@ -1,19 +1,28 @@
 {
   "name": "bytesof/craft-formable",
-  "description": "Commercial form builder plugin for Craft CMS 5.",
+  "description": "Accessible multi-page forms with conditional logic, GDPR tools and integrations.",
   "type": "craft-plugin",
   "license": "proprietary",
   "homepage": "https://github.com/Bytes-Of/craft-formable",
   "minimum-stability": "stable",
   "prefer-stable": true,
   "keywords": [
-    "craft",
     "craftcms",
     "craft-plugin",
-    "cms",
-    "form",
     "forms",
-    "form-builder"
+    "form builder",
+    "contact form",
+    "multi-page forms",
+    "conditional logic",
+    "accessibility",
+    "wcag",
+    "gdpr",
+    "spam protection",
+    "hubspot",
+    "mailchimp",
+    "slack",
+    "webhooks",
+    "graphql"
   ],
   "support": {
     "docs": "https://github.com/Bytes-Of/craft-formable/tree/main/docs",

@@ -1,8 +1,6 @@
 # Release Notes for Formable
 
-## 1.0.0-beta.2 - 2026-09-28
-
-The second beta of 1.0.0, for trying Formable on real sites before the final release. Since the first beta, Dropdown, Radio Buttons, Checkboxes and Multi-select answers show their option labels instead of their stored values, and there are smaller fixes to the form builder and the default theme, all listed below. Please report anything that goes wrong at https://github.com/Bytes-Of/craft-formable/issues.
+## 1.0.0 - 2026-09-28
 
 This is Formable’s first release, for Craft CMS 5.10.7 or later. Pre-release builds were used to develop it, so **Changed** and **Fixed** record where 1.0.0 differs from those, for anyone who installed one. On a fresh install, everything below is simply how Formable behaves.
 
