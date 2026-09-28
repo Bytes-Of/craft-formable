@@ -1,0 +1,27 @@
+{% extends '_layouts/cp' %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+    { label: 'Forms'|t('formable'), url: cpUrl('formable/forms') },
+] %}
+
+{% set bodyClass = 'formable-builder-page' %}
+
+{% block content %}
+    {#
+      The builder owns everything below the CP chrome. It reads its whole
+      state from `builderConfig` and posts back through the actions listed
+      there, so this template stays a mount point and nothing more.
+    #}
+    <div
+        id="formable-builder"
+        data-formable-config="{{ builderConfig|json_encode }}"
+        data-formable-csrf-name="{{ craft.app.config.general.csrfTokenName }}"
+        data-formable-csrf-token="{{ craft.app.request.csrfToken }}"
+    >
+        <div class="formable-builder__booting">
+            <div class="spinner"></div>
+            <p>{{ 'Loading the form builder…'|t('formable') }}</p>
+        </div>
+    </div>
+{% endblock %}

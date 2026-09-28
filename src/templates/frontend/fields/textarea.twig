@@ -1,0 +1,15 @@
+{# `--formable-textarea-rows` is set from the `rows` attribute by
+   `renderStyleVars()` in `main.ts`, not an inline `style` (CSP) - the browser's
+   own native `rows` sizing is what a no-JS visitor gets instead, which is
+   merely approximate rather than wrong: it undershoots a custom line-height by
+   a little, it doesn't collapse to nothing. #}
+<textarea id="{{ inputId }}"
+    name="{{ inputName }}"
+    class="formable-input formable-input--textarea"
+    rows="{{ field.rows }}"
+    dir="auto"
+    {%- if field.placeholder %} placeholder="{{ field.placeholder }}"{% endif %}
+    {%- if field.limit %} maxlength="{{ field.limit }}"{% endif %}
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>{{ value ?? field.defaultValue }}</textarea>

@@ -1,0 +1,221 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+{% import 'formable/_includes/upgradeBadge' as upgrade %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+    { label: 'Submissions'|t('formable'), url: cpUrl('formable/submissions') },
+] %}
+
+{% set statusOptions = [] %}
+{% for status in statuses %}
+    {% set statusOptions = statusOptions|merge([{ label: status.name, value: status.id }]) %}
+{% endfor %}
+
+{% block actionButton %}
+    {% if canEdit %}
+        <button type="submit" form="submission-form" class="btn submit">{{ 'Save'|t('app') }}</button>
+    {% endif %}
+{% endblock %}
+
+{% block content %}
+    {# The fields are rendered through the same front-end pack the site uses, so
+       the CP editor and the visitor see one source of truth for each control.
+       The theme stylesheet rides along so the controls aren't bare in the CP. #}
+    {% do craft.formable.registerAssets(form, { theme: true }) %}
+
+    <form id="submission-form" method="post" accept-charset="UTF-8">
+        {{ csrfInput() }}
+        {{ actionInput('formable/manage-submissions/save') }}
+        {{ redirectInput('formable/submissions/' ~ submission.id) }}
+        {{ hiddenInput('submissionId', submission.id) }}
+
+        {% if statusOptions is not empty %}
+            {{ forms.selectField({
+                label: 'Status'|t('formable'),
+                id: 'statusId',
+                name: 'statusId',
+                options: statusOptions,
+                value: submission.statusId,
+                disabled: not canEdit,
+            }) }}
+        {% endif %}
+
+        <div class="formable-cp-fields{{ canEdit ? '' : ' formable-cp-fields--readonly' }}">
+            {% for handle, field in fields %}
+                {{ craft.formable.renderField(form, handle, { submission: submission }) }}
+            {% else %}
+                <p class="light">{{ 'This form collects no field values.'|t('formable') }}</p>
+            {% endfor %}
+        </div>
+    </form>
+
+    <div class="pane formable-cp-notes">
+        <h2>{{ 'Notes'|t('formable') }}</h2>
+
+        {% if canEdit %}
+            <form method="post" accept-charset="UTF-8" class="formable-cp-notes__add">
+                {{ csrfInput() }}
+                {{ actionInput('formable/manage-submissions/add-note') }}
+                {{ redirectInput('formable/submissions/' ~ submission.id) }}
+                {{ hiddenInput('submissionId', submission.id) }}
+                {{ forms.textarea({ name: 'note', rows: 2, placeholder: 'Add a note…'|t('formable') }) }}
+                <div class="formable-cp-notes__submit">
+                    <button type="submit" class="btn">{{ 'Add note'|t('formable') }}</button>
+                </div>
+            </form>
+        {% endif %}
+
+        <ul class="formable-cp-notes__list">
+            {% for note in notes %}
+                <li class="formable-cp-note">
+                    <div class="formable-cp-note__body">{{ note.note|nl2br }}</div>
+                    <div class="formable-cp-note__meta light">
+                        {{ note.author ?? 'System'|t('formable') }}
+                        {%- if note.dateCreated %} · {{ note.dateCreated|datetime('short') }}{% endif %}
+                        {% if canEdit %}
+                            &middot;
+                            <form method="post" accept-charset="UTF-8" class="formable-cp-note__delete">
+                                {{ csrfInput() }}
+                                {{ actionInput('formable/manage-submissions/delete-note') }}
+                                {{ redirectInput('formable/submissions/' ~ submission.id) }}
+                                {{ hiddenInput('submissionId', submission.id) }}
+                                {{ hiddenInput('noteId', note.id) }}
+                                <button type="submit" class="formable-linkbtn">{{ 'Delete'|t('app') }}</button>
+                            </form>
+                        {% endif %}
+                    </div>
+                </li>
+            {% else %}
+                <li class="light">{{ 'No notes yet.'|t('formable') }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+{% endblock %}
+
+{% block details %}
+    <div class="meta read-only">
+        <div class="data">
+            <h5 class="heading">{{ 'Form'|t('formable') }}</h5>
+            <div class="value"><a href="{{ form.cpEditUrl }}">{{ form.title }}</a></div>
+        </div>
+        <div class="data">
+            <h5 class="heading">{{ 'Submitted by'|t('formable') }}</h5>
+            <div class="value">
+                {%- if submission.user %}<a href="{{ submission.user.cpEditUrl }}">{{ submission.user.name }}</a>
+                {%- else %}{{ 'Guest'|t('formable') }}{% endif -%}
+            </div>
+        </div>
+        {# Only where it can differ: on a single-site install every submission
+           answers the same, and the row would be noise on every detail page. #}
+        {% if craft.app.isMultiSite %}
+            <div class="data">
+                <h5 class="heading">{{ 'Submitted from'|t('formable') }}</h5>
+                <div class="value">
+                    {%- if submission.submittedSite %}{{ submission.submittedSite.name|t('site') }}
+                    {%- else %}<span class="light">{{ 'Unknown'|t('formable') }}</span>{% endif -%}
+                </div>
+            </div>
+        {% endif %}
+        {% if submission.ipAddress %}
+            <div class="data">
+                <h5 class="heading">{{ 'IP Address'|t('formable') }}</h5>
+                <div class="value code">{{ submission.ipAddress }}</div>
+            </div>
+        {% endif %}
+        <div class="data">
+            <h5 class="heading">{{ 'Date Created'|t('app') }}</h5>
+            <div class="value">{{ submission.dateCreated ? submission.dateCreated|datetime('short') : '' }}</div>
+        </div>
+        <div class="data">
+            <h5 class="heading">{{ 'Date Updated'|t('app') }}</h5>
+            <div class="value">{{ submission.dateUpdated ? submission.dateUpdated|datetime('short') : '' }}</div>
+        </div>
+        {% if submission.isSpam %}
+            <div class="data">
+                <h5 class="heading">{{ 'Spam'|t('formable') }}</h5>
+                <div class="value">{{ spamReasonLabel }}</div>
+            </div>
+        {% endif %}
+    </div>
+
+    {% if canEdit %}
+        {# Flag or clear spam from the detail view - the single-submission
+           counterpart to the index's bulk spam actions. #}
+        <form method="post" accept-charset="UTF-8" class="formable-cp-spam">
+            {{ csrfInput() }}
+            {{ actionInput('formable/manage-submissions/set-spam') }}
+            {{ redirectInput('formable/submissions/' ~ submission.id) }}
+            {{ hiddenInput('submissionId', submission.id) }}
+            {{ hiddenInput('spam', submission.isSpam ? '0' : '1') }}
+            <button type="submit" class="btn">
+                {{ submission.isSpam ? 'Not spam'|t('formable') : 'Mark as spam'|t('formable') }}
+            </button>
+        </form>
+
+        <form method="post" accept-charset="UTF-8" class="formable-cp-delete">
+            {{ csrfInput() }}
+            {{ actionInput('formable/manage-submissions/delete') }}
+            {{ hiddenInput('submissionId', submission.id) }}
+            <button type="submit" class="btn" data-icon="trash"
+                data-confirm="{{ 'Are you sure you want to delete this submission?'|t('formable') }}">
+                {{ 'Delete'|t('app') }}
+            </button>
+        </form>
+    {% endif %}
+
+    {% if not proEnabled %}
+        {{ upgrade.styles() }}
+        <div class="formable-cp-history">
+            <h2>{{ 'Edit history'|t('formable') }} {{ upgrade.badge() }}</h2>
+            {{ upgrade.prompt('Edit history'|t('formable')) }}
+        </div>
+    {% else %}
+        <div class="formable-cp-history">
+            <h2>{{ 'Edit history'|t('formable') }}</h2>
+            <ul class="formable-cp-history__list">
+                {% for entry in history %}
+                    <li class="formable-cp-history__entry">
+                        <div class="formable-cp-history__meta light">
+                            {{ entry.author ?? 'System'|t('formable') }}
+                            {%- if entry.dateCreated %} · {{ entry.dateCreated|datetime('short') }}{% endif %}
+                        </div>
+                        <ul class="formable-cp-history__changes">
+                            {% for change in entry.changes %}
+                                <li>
+                                    <strong>{{ change.label }}:</strong>
+                                    <span class="formable-cp-history__from">{{ change.from ?: '-' }}</span>
+                                    →
+                                    <span class="formable-cp-history__to">{{ change.to ?: '-' }}</span>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
+                {% else %}
+                    <li class="light">{{ 'No edits recorded.'|t('formable') }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    {% endif %}
+{% endblock %}
+
+{% css %}
+    .formable-cp-fields { margin-top: 14px; }
+    .formable-cp-fields .formable-field { margin-bottom: 18px; }
+    .formable-cp-fields--readonly { opacity: .85; pointer-events: none; }
+    .formable-cp-notes { margin-top: 24px; }
+    .formable-cp-notes__submit { margin-top: 8px; }
+    .formable-cp-notes__list { list-style: none; margin: 16px 0 0; padding: 0; }
+    .formable-cp-note { padding: 10px 0; border-top: 1px solid var(--hairline-color, #e3e5e8); }
+    .formable-cp-note__meta { margin-top: 4px; font-size: 12px; }
+    .formable-cp-note__delete { display: inline; }
+    .formable-linkbtn { background: none; border: 0; padding: 0; color: var(--link-color, #0b69a3); cursor: pointer; font: inherit; }
+    .formable-linkbtn:hover { text-decoration: underline; }
+    .formable-cp-spam { margin-top: 14px; }
+    .formable-cp-delete { margin-top: 14px; }
+    .formable-cp-history { margin-top: 24px; }
+    .formable-cp-history__list { list-style: none; margin: 8px 0 0; padding: 0; }
+    .formable-cp-history__entry { padding: 8px 0; border-top: 1px solid var(--hairline-color, #e3e5e8); }
+    .formable-cp-history__changes { margin: 4px 0 0; padding-left: 16px; font-size: 12px; }
+    .formable-cp-history__from { text-decoration: line-through; opacity: .7; }
+{% endcss %}

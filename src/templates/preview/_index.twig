@@ -1,0 +1,153 @@
+{#
+ # The gallery shell: a scenario index down the side, and for every scenario
+ # a light and a dark frame side by side. It never renders a form itself -
+ # each frame is an iframe pointed at `formable/preview/frame`
+ # ({@see \bytesof\formable\controllers\PreviewController::actionFrame()}), the
+ # bare per-scenario document from step 4. That's also why this template needs
+ # its own asset bundle rather than inheriting Formable's: with no
+ # `craft.formable.renderForm()` call here, nothing else registers CSS or JS.
+ #
+ # Named `_index.twig`, not `index.twig`: Craft serves any template whose path
+ # has no underscore-prefixed segment directly by URL
+ # ({@see \craft\web\UrlManager::_getTemplateRoute()}), independently of
+ # `devMode` and of whether `Plugin.php` registered a rule for it - the one
+ # thing {@see \bytesof\formable\controllers\PreviewController::beforeAction()}'s
+ # gate can't reach, since that route never touches the controller at all.
+ # `_frame.twig` already had the leading underscore for the same reason; this
+ # was the gap.
+ #
+ # `theme` and `density` are left off each frame's initial URL on purpose: the
+ # controller falls back to the scenario's own opinion (or `default`/
+ # `comfortable`) when the query param is absent, so the Theme levels group
+ # shows what it exists to show before anyone touches a control. The two
+ # selects below only take effect once changed - `preview.js` then writes
+ # `theme`/`density` onto every frame's `src` explicitly, including those.
+ #
+ # `width`/`host`/`chrome`/`dir` ([[frontend-embeddability-review]] chunk 1)
+ # follow the same pattern, but each has a blank "Scenario default" option:
+ # choosing it removes the param from every frame's `src` again, falling back
+ # to whatever `previewDefaults` the scenario itself declared (or the
+ # hardcoded default) - the "Embed contexts" group needs that round trip, since
+ # `embed-rtl`/`embed-dialog`/etc. each open already showing their own toggle.
+ #
+ # Variables:
+ #   groups   array<group label, array<{key, label}>>, in display order
+ #}
+{% do view.registerAssetBundle('bytesof\\formable\\web\\assets\\preview\\PreviewAsset') %}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language|split('-')|first }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>Formable preview gallery</title>
+    {{ head() }}
+</head>
+<body>
+    {{ beginBody() }}
+    <div class="preview-shell">
+        <nav class="preview-sidebar">
+            <h1>Formable preview</h1>
+            {% for groupName, scenarios in groups %}
+                <ul class="preview-sidebar__group">
+                    <li class="preview-sidebar__group-title">
+                        <a class="preview-sidebar__link" href="#group-{{ groupName|kebab }}">{{ groupName }}</a>
+                    </li>
+                    {% for scenario in scenarios %}
+                        <li><a class="preview-sidebar__link" href="#scenario-{{ scenario.key }}">{{ scenario.label }}</a></li>
+                    {% endfor %}
+                </ul>
+            {% endfor %}
+        </nav>
+        <div>
+            <div class="preview-controls">
+                <label>
+                    Theme
+                    <select data-control="theme">
+                        <option value="none">None</option>
+                        <option value="contract">Contract</option>
+                        <option value="reset">Reset</option>
+                        <option value="default" selected>Default</option>
+                    </select>
+                </label>
+                <label>
+                    Density
+                    <select data-control="density">
+                        <option value="comfortable" selected>Comfortable</option>
+                        <option value="compact">Compact</option>
+                    </select>
+                </label>
+                <label>
+                    <input type="checkbox" data-control="layout">
+                    Single column
+                </label>
+                <label>
+                    Width
+                    <select data-control="width">
+                        <option value="" selected>Scenario default</option>
+                        <option value="full">Full</option>
+                        <option value="280">280px</option>
+                        <option value="400">400px</option>
+                        <option value="600">600px</option>
+                        <option value="960">960px</option>
+                    </select>
+                </label>
+                <label>
+                    Host CSS
+                    <select data-control="host">
+                        <option value="" selected>Scenario default</option>
+                        <option value="none">None</option>
+                        <option value="tailwind-v3">Tailwind v3 Preflight</option>
+                        <option value="tailwind-v4">Tailwind v4 (layered)</option>
+                        <option value="bootstrap5">Bootstrap 5 Reboot</option>
+                        <option value="prose">Tailwind Typography .prose</option>
+                        <option value="font-62">62.5% root font</option>
+                    </select>
+                </label>
+                <label>
+                    Chrome
+                    <select data-control="chrome">
+                        <option value="" selected>Scenario default</option>
+                        <option value="none">None</option>
+                        <option value="dialog">Dialog</option>
+                        <option value="sidebar">Sidebar</option>
+                        <option value="flex-column">Flex column host</option>
+                        <option value="grid">Grid host</option>
+                    </select>
+                </label>
+                <label>
+                    <input type="checkbox" data-control="dir">
+                    RTL
+                </label>
+            </div>
+            <main class="preview-main">
+                {% for groupName, scenarios in groups %}
+                    <h2 class="preview-group__title" id="group-{{ groupName|kebab }}">{{ groupName }}</h2>
+                    {% for scenario in scenarios %}
+                        <section class="preview-scenario" id="scenario-{{ scenario.key }}">
+                            <p class="preview-scenario__label">{{ scenario.label }}</p>
+                            <div class="preview-scenario__frames">
+                                {% for scheme in ['light', 'dark'] %}
+                                    <div class="preview-frame" data-scheme="{{ scheme }}">
+                                        <div class="preview-frame__bar">
+                                            <span>{{ scheme|capitalize }}</span>
+                                            <button type="button" class="preview-frame__copy" data-preview-copy>Copy link</button>
+                                        </div>
+                                        <iframe
+                                            data-preview-frame
+                                            loading="lazy"
+                                            title="{{ scenario.label }} ({{ scheme }})"
+                                            src="{{ url('formable/preview/frame', {scenario: scenario.key, scheme: scheme}) }}"
+                                        ></iframe>
+                                    </div>
+                                {% endfor %}
+                            </div>
+                        </section>
+                    {% endfor %}
+                {% endfor %}
+            </main>
+        </div>
+    </div>
+    {{ endBody() }}
+</body>
+</html>

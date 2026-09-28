@@ -1,0 +1,65 @@
+{#
+ # One page of a form.
+ #
+ # M4 renders every page at once; M5 adds the navigation that shows one at a
+ # time. The markup is already page-scoped so that change is JS and a `hidden`
+ # attribute, not a template rewrite.
+ #
+ # Variables:
+ #   form, page, pageCount, pageIndex, isFirstPage, isLastPage, values, errors, templatePath
+ #   formId  this render's unique form id (see `form.twig`) - namespaces
+ #           `pageId` below so two renders of the same form on one page don't
+ #           mint the same `id`/`aria-labelledby` pair for the same page.
+ #   headingLevel  heading level the page label renders at (see `form.twig`)
+ #}
+{% set formId = formId ?? 'formable' %}
+{% set headingLevel = headingLevel ?? 2 %}
+{% set pageId = "#{formId}-page-#{page.id}" %}
+{% set isOnlyPage = pageCount == 1 %}
+{% set conditions = craft.formable.conditionsData(page.settings.conditions ?? null) %}
+
+{# Split the page's rows into groups at every row that holds nothing but a
+   field whose `startsGroup()` is true (Section) - that row is a boundary, not
+   content, so it's consumed here rather than rendered. A page with no such
+   boundary ends up with exactly one group and renders exactly as before;
+   `.formable-group` only appears once there's more than one to tell apart -
+   see `internal/decisions/0042`. #}
+{% set groups = [] %}
+{% set currentGroup = [] %}
+{% for row in page.rows ?? [] %}
+    {% if row.fields|length == 1 and row.fields[0].startsGroup %}
+        {% if currentGroup|length %}{% set groups = groups|merge([currentGroup]) %}{% endif %}
+        {% set currentGroup = [] %}
+    {% else %}
+        {% set currentGroup = currentGroup|merge([row]) %}
+    {% endif %}
+{% endfor %}
+{% if currentGroup|length %}{% set groups = groups|merge([currentGroup]) %}{% endif %}
+{% set isGrouped = groups|length > 1 %}
+
+<div class="formable-page"
+    id="{{ pageId }}"
+    data-formable-page="{{ pageIndex }}"
+    data-formable-page-id="{{ page.id }}"
+    {%- if conditions %} data-formable-conditions="{{ conditions|json_encode|e('html_attr') }}"{% endif %}
+    {%- if not isOnlyPage %} role="group" aria-labelledby="{{ pageId }}-label"{% endif %}>
+
+    {% if not isOnlyPage and page.label %}
+        <h{{ headingLevel }} class="formable-page__label" id="{{ pageId }}-label">{{ page.label }}</h{{ headingLevel }}>
+    {% endif %}
+
+    {% for group in groups %}
+        {% if isGrouped %}<div class="formable-group">{% endif %}
+        {% for row in group %}
+            {{ include(craft.formable.template('_row', templatePath), {
+                form: form,
+                row: row,
+                values: values,
+                errors: errors,
+                templatePath: templatePath,
+                formId: formId,
+            }, with_context = false) }}
+        {% endfor %}
+        {% if isGrouped %}</div>{% endif %}
+    {% endfor %}
+</div>

@@ -1,0 +1,125 @@
+{# 
+ # Wrapper around every rendered field. Owns the accessibility contract so
+ # individual field templates only have to emit their control(s):
+ #
+ #  - label/legend is always associated with the control(s)
+ #  - instructions and errors are referenced via aria-describedby
+ #  - invalid controls get aria-invalid; the failing field is announced by the
+ #    form-level error summary, which `main.ts` focuses on both render paths
+ #
+ # Variables:
+ #   form       the field's Form - always set on this and every template it
+ #              includes into, since every render path passes it down. `field`
+ #              already carries any site override applied to its label/
+ #              instructions ({@see \bytesof\formable\services\Translations::localizePages()}),
+ #              so this partial prints its properties directly rather than
+ #              resolving them through a helper.
+ #   field      FormField instance
+ #   value      current value
+ #   errors     array of error message strings
+ #   inputId    DOM id for the (first) control
+ #   inputName  name attribute for the control - the field's own by default
+ #   formId     the render's unique form id (see `form.twig`) - the default
+ #              `inputId` is namespaced under it, so two renders of the same
+ #              form on one page never mint the same field id. Not set when
+ #              `renderField()` renders a field on its own outside a form
+ #              shell, so the default falls back to the bare per-field id it
+ #              always used.
+ #   templatePath  the form's template override directory, or null
+ #}
+{% set errors = errors ?? [] %}
+{% set hasErrors = errors|length > 0 %}
+{% set inputId = inputId ?? ((formId is defined and formId) ? "#{formId}-field-#{field.id}" : "formable-#{field.id}") %}
+{% set inputName = inputName ?? field.inputName %}
+{% set instructionsId = "#{inputId}-instructions" %}
+{% set errorsId = "#{inputId}-errors" %}
+
+{% set describedBy = [] %}
+{% if field.instructions %}{% set describedBy = describedBy|merge([instructionsId]) %}{% endif %}
+{% set describedBy = describedBy|merge(field.extraDescribedBy(inputId)) %}
+{% if hasErrors %}{% set describedBy = describedBy|merge([errorsId]) %}{% endif %}
+
+{# `templatePath` rides along in the context so composite fields (name,
+   address) and the ones built on text (email, url) resolve their own
+   sub-includes against the same override. #}
+{% set context = {
+    form: form,
+    field: field,
+    value: value ?? null,
+    errors: errors,
+    inputId: inputId,
+    inputName: inputName,
+    describedBy: describedBy|join(' '),
+    hasErrors: hasErrors,
+    templatePath: templatePath ?? null,
+} %}
+
+{% set classes = ['formable-field', "formable-field--#{field.handle ?: 'block'}"] %}
+{% set fieldWidth = field.width|default('auto') %}
+{% if fieldWidth != 'auto' %}{% set classes = classes|merge(["formable-field--width-#{fieldWidth}"]) %}{% endif %}
+{% if hasErrors %}{% set classes = classes|merge(['formable-field--error']) %}{% endif %}
+{% if field.required %}{% set classes = classes|merge(['formable-field--required']) %}{% endif %}
+{% if field.cssClasses %}{% set classes = classes|merge([field.cssClasses]) %}{% endif %}
+
+{# Conditions ride along as a data attribute for the front-end enhancement to
+   read. A field no author gave a condition emits nothing, so the JS engine
+   never even looks at it. #}
+{% set conditions = field.conditionsConfig %}
+
+{# Same shape, for the declarative subset of validation
+   (`helpers/Validation.php` server-side, `shared/validation.ts` client-side)
+   - a field type that doesn't opt in, or one with nothing to check, emits
+   nothing either. #}
+{% set validation = field.validationSpecConfig %}
+
+<div class="{{ classes|join(' ') }}"
+    data-formable-field="{{ field.handle }}"
+    {%- if conditions %} data-formable-conditions="{{ conditions|json_encode|e('html_attr') }}"{% endif %}
+    {%- if validation %} data-formable-validation="{{ validation|json_encode|e('html_attr') }}"{% endif %}>
+    {% if field.usesFieldset %}
+        {# `id` and `tabindex="-1"` make the fieldset itself the jump target
+           for the error summary's anchor links (`#formable-{id}`, same value
+           as a plain field's `<input id>`) - without `tabindex` a fragment
+           link to a non-interactive element like `<fieldset>` scrolls it into
+           view but leaves keyboard focus on the document, same problem
+           `swapStep()` in main.ts solves for the step heading. #}
+        <fieldset class="formable-field__fieldset"
+            id="{{ inputId }}"
+            tabindex="-1"
+            {%- if field.required %} aria-required="true"{% endif %}
+            {%- if describedBy %} aria-describedby="{{ describedBy|join(' ') }}"{% endif %}>
+            <legend class="formable-field__legend{% if field.labelHidden %} formable-visually-hidden{% endif %}">
+                {{ field.label }}
+                {%- if field.required %} <span class="formable-field__required" aria-hidden="true">*</span>{% endif %}
+            </legend>
+            {%- if field.instructions %}
+            <div class="formable-field__instructions" id="{{ instructionsId }}">{{ field.instructions }}</div>
+            {% endif %}
+            {{ include(craft.formable.template(field.inputTemplate, templatePath ?? null), context, with_context = false) }}
+        </fieldset>
+    {% else %}
+        {% if field.hasValue and not field.rendersOwnLabel %}
+            <label class="formable-field__label{% if field.labelHidden %} formable-visually-hidden{% endif %}" for="{{ inputId }}">
+                {{ field.label }}
+                {%- if field.required %} <span class="formable-field__required" aria-hidden="true">*</span>{% endif %}
+            </label>
+        {% endif %}
+        {%- if field.instructions %}
+        <div class="formable-field__instructions" id="{{ instructionsId }}">{{ field.instructions }}</div>
+        {% endif %}
+        {{ include(craft.formable.template(field.inputTemplate, templatePath ?? null), context, with_context = false) }}
+    {% endif %}
+
+    {% if hasErrors %}
+        {# No `role="alert"`, on this render or the AJAX one `main.ts` builds
+           (0064): it reaches the control through the `-errors` id in its
+           `aria-describedby`, and the focused error summary already names
+           every failing field, so a per-field alert here would only add a
+           simultaneous volley on top of that. #}
+        <div class="formable-field__errors" id="{{ errorsId }}" data-formable-field-errors>
+            {% for error in errors %}
+                <p class="formable-field__error">{{ error }}</p>
+            {% endfor %}
+        </div>
+    {% endif %}
+</div>

@@ -1,0 +1,25 @@
+{#
+ # The closed-form message.
+ #
+ # Rendered in place of the form's fields when it isn't accepting submissions -
+ # disabled or trashed in the CP, or (on Pro) outside its schedule window. A
+ # template embeds the form the same way whether it's open or shut; the renderer
+ # swaps this in once it closes, so the page never has to check for itself.
+ #
+ # The message is already Twig-rendered against the form. An author may include
+ # markup, but writing it needs only `formable:saveForms`, not an admin account,
+ # so it's purified rather than trusted - the same rule as the HTML Block and
+ # Agree fields (internal/decisions/0099). Override `frontend/_closed` in a
+ # template pack to wrap it in the site's own chrome.
+ #
+ # Variables:
+ #   form      Form element
+ #   settings  FormSettings
+ #   message   the resolved closed message
+ #}
+<div class="formable-closed"
+    data-formable-closed
+    data-formable-handle="{{ form.handle }}"
+    role="status">
+    {{ message|purify }}
+</div>

@@ -1,0 +1,1012 @@
+/**
+ * Formable reset - `formable-contract.css` plus layout, no paint.
+ *
+ * Layout (flex/grid, gap, alignment) and the disabled/submitting state hooks,
+ * on top of the a11y utility, `[hidden]` state and focus-ring shape
+ * `formable-contract.css` already ships. No colour, no typography, no radius
+ * rule lives here: a design-system site loading this file alone and painting
+ * everything itself should never have to fight a plugin declaration to do
+ * it.
+ *
+ * `formable-theme.css` is everything this file leaves unpainted - it depends on
+ * this file for layout and loads alongside it. The three sheets sit in the
+ * `formable.reset` / `formable.theme` / `formable.contract` cascade layers, in
+ * that precedence order - declared in `formable-tokens.css`, loaded first.
+ * `formable.contract` last means this file never has to re-assert a `[hidden]`
+ * rule against its own `display: flex`/`grid`: the contract wins outright. An
+ * unlayered site rule still beats all of them without `!important`.
+ */
+
+@layer formable.reset {
+  /* `overflow-wrap` is inherited, so one declaration here reaches every
+     descendant's text - a long unbroken value in a review answer, a chip
+     label, a step name - without a per-component rule. See
+     [[frontend-embeddability-review]] chunk 9 (M6).
+
+     `max-inline-size` defaults to `none`, so a form with no opinion keeps
+     filling its container exactly as before. That "before" needs an explicit
+     `inline-size: 100%` to hold in a flex-column or grid host, not just a
+     block one: a block box with `width: auto` already has its used inline
+     margins forced to `0`, but a flex/grid item with a `auto` cross size
+     instead *stretches* to fill the container - and `margin-inline: auto`
+     takes precedence over that stretch, so without a definite width the form
+     collapsed to fit-content the moment its host was a flex column or a grid
+     track (see [[frontend-embeddability-review]] chunk 14, N3). Pairing
+     `inline-size: 100%` with `box-sizing: border-box` also matters once
+     `--formable-form-max-inline-size` is set alongside `.formable-form--bordered`
+     (`formable-theme.css`): border-box keeps that variant's own border and
+     padding inside the resolved width instead of adding to it. With the
+     width pinned to `100%`, `margin-inline: auto` is inert until
+     `max-inline-size` caps it below the container, at which point the freed
+     space is what actually centres the form - in a block, flex-column or
+     grid host alike. See [[frontend-embeddability-review]] chunk 11 (M6, the
+     form's own measure, not the prose-only `--formable-measure`). */
+  .formable-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-section-gap);
+    overflow-wrap: anywhere;
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: var(--formable-form-max-inline-size, none);
+    margin-inline: auto;
+  }
+
+  /* The step is the layout unit every `@container` query below measures -
+     progress, the current page or the review, and the navigation all nest
+     inside it (`_step.twig`). Named rather than anonymous so a form nested
+     inside another Formable form's own step (never happens today, but
+     `@container` with no name would silently pick up the wrong ancestor if
+     it ever did) can't be mismatched. `inline-size` containment gives the
+     element no intrinsic size to report to its own parent - a host that
+     sizes itself to its content, like a `<dialog open>` with no explicit
+     width, has nothing to size to and collapses. `--formable-min-inline-size`
+     is the floor that stops that collapse - capped by the *containing
+     block* (`100%`), not the viewport: a 280px sidebar or a phone with host
+     padding is narrower than the 20rem default without being anywhere near
+     100vw, and the floor has to yield to that container or it bleeds past
+     it and forces a scrollbar. See [[frontend-embeddability-review]]
+     chunk 5, chunk 14 (N2). */
+  [data-formable-step] {
+    container-name: formable-step;
+    container-type: inline-size;
+    min-inline-size: min(var(--formable-min-inline-size, 20rem), 100%);
+  }
+
+  /* The one case `100%` can't cover: a host that sizes *itself* to its
+     content instead of giving the step a definite containing block -
+     `<dialog open>` with no explicit width, a `[popover]`. There, `100%`
+     resolves against a box that's waiting on the step's own report,
+     collapsing the floor right where it exists to prevent a collapse.
+     Falling back to `100vw` here is the same trade the original rule made:
+     not tight enough to stop a horizontal scrollbar on a viewport narrower
+     than the default, but a shrink-wrapped dialog is already expected to
+     cap itself against the viewport. */
+  :where(dialog, [popover]) [data-formable-step] {
+    min-inline-size: min(var(--formable-min-inline-size, 20rem), 100vw);
+  }
+
+  /* Lands `swapStep()`'s `scrollIntoView()` and a clicked error-summary link
+     below a sticky host header instead of behind it. The token is `0` by
+     default, so this is a no-op until a site sets it. The selector list
+     matches exactly the elements an error-summary anchor can point to - the
+     `fieldset` or first control `buildErrorSummaryItem()` in `main.ts` reads
+     the id from. See [[frontend-embeddability-review]] chunk 7. */
+  [data-formable-step],
+  [data-formable-field] fieldset,
+  [data-formable-field] input,
+  [data-formable-field] select,
+  [data-formable-field] textarea {
+    scroll-margin-block-start: var(--formable-scroll-margin, 0);
+  }
+
+  /* ------------------------------------------------------------------ layout */
+
+  .formable-page {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-group-gap);
+  }
+
+  /* Wraps a run of rows between two Section boundaries (`_page.twig`) once a
+     page has more than one - the grouping primitive itself lives here, in
+     layout; `formable-theme.css` only adds the card's paint. A page with no
+     Section field never gets this element at all. */
+  .formable-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-group-gap);
+  }
+
+  /* Side-by-side only where there's room for it; below that every field is
+     full width, which is the right answer on a phone regardless of the row's
+     size. Intrinsic rather than a breakpoint - `auto-fit` fills the row with
+     as many `min(100%, 12rem)`-or-wider columns as actually fit, so a 3-field
+     row is already one column in a 280px sidebar on a desktop viewport and
+     three columns the moment there's room, with no query needed at all. See
+     [[frontend-embeddability-review]] chunk 5. */
+  .formable-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+    gap: var(--formable-field-gap);
+  }
+
+  /* A row where at least one field sets an explicit width can't go intrinsic
+     the way the equal-split grid above does - a fixed fraction only means
+     anything once the row has room for it, so this stays behind a query.
+     Switches from the equal-split grid to flex: the sized fields take their
+     fraction of the row and any `auto` fields share whatever is left.
+     `FormField::$width` feeds `data-formable-row-widths` on the row and
+     `formable-field--width-*` on the field; an all-`auto` row keeps the grid
+     above untouched. */
+  @container formable-step (inline-size >= 40rem) {
+    .formable-row[data-formable-row-widths] {
+      display: flex;
+      flex-wrap: wrap;
+    }
+
+    .formable-row[data-formable-row-widths] > .formable-field {
+      flex: 1 1 0;
+    }
+
+    .formable-row[data-formable-row-widths] > .formable-field--width-full {
+      flex-basis: 100%;
+    }
+
+    .formable-row[data-formable-row-widths] > .formable-field--width-half {
+      flex: 0 1 calc(50% - var(--formable-field-gap) / 2);
+    }
+
+    .formable-row[data-formable-row-widths] > .formable-field--width-third {
+      flex: 0 1 calc((100% - 2 * var(--formable-field-gap)) / 3);
+    }
+
+    .formable-row[data-formable-row-widths] > .formable-field--width-quarter {
+      flex: 0 1 calc((100% - 3 * var(--formable-field-gap)) / 4);
+    }
+  }
+
+  .formable-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+    min-width: 0;
+  }
+
+  /* A field's own control is already capped by the row it sits in; its
+     instructions and errors are prose, which a wide container (a 960px
+     layout, a full-bleed page) would otherwise stretch into an unreadably
+     long line with nothing else to stop it. See
+     [[frontend-embeddability-review]] chunk 9 (M6). */
+  .formable-field__instructions,
+  .formable-field__errors {
+    max-inline-size: var(--formable-measure);
+  }
+
+  /* Composite fields - Name, Address (`fields/_subFields.twig`). The fieldset
+     legend names the group; each sub-input carries its own visible label.
+     Without this the pairs ran together as label, full-width input, label,
+     input with nothing between them. */
+  .formable-subfields {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-4);
+  }
+
+  .formable-subfield {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+  }
+
+  /* Zeroes the browser's default fieldset border/padding rather than painting
+     one - a native fieldset otherwise ships its own inset border no theme
+     asked for. */
+  .formable-field__fieldset {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+
+  /* ------------------------------------------------------------- variants */
+
+  /* Labels-left (2.5/5.5) - `FormSettings::$labelPosition` (Wave 4) will emit
+     `formable-form--labels-left` on the wrapper. Only the plain-field shape
+     (label is a direct child of `.formable-field`) converts.
+     `.formable-field__fieldset` (Name, Address, Radio, Checkboxes, Table) is
+     deliberately untouched: a `<legend>` renders outside its fieldset's own
+     flex formatting context in every current engine - `flex-direction: row`
+     on the fieldset still stacks the legend on its own line above the rest
+     of the children, tried and confirmed against the preview gallery, not
+     just read off a spec. A fieldset field keeps its legend-above layout
+     even under this variant; see `internal/decisions/0048`. `:has()` is
+     already load-bearing elsewhere in this stylesheet
+     (`.formable-multiselect__control:has(:focus-visible)` above).
+
+     Gated behind the same container query as the row layout below it - a
+     fixed-width label column plus a usable control needs more room than a
+     narrow container has. Below the threshold every rule here simply doesn't
+     match, so the field falls through to `.formable-field`'s own default
+     (label above control, no indent on instructions/errors) with nothing
+     else to override - the narrow fallback [[frontend-embeddability-review]]
+     chunk 5 asked for is the plain layout every other field already has. */
+  @container formable-step (inline-size >= 40rem) {
+    .formable-form--labels-left .formable-field:has(> .formable-field__label) {
+      flex-flow: row wrap;
+      align-items: baseline;
+      column-gap: var(--formable-space-4);
+    }
+
+    .formable-form--labels-left .formable-field__label {
+      flex: 0 0 var(--formable-label-width);
+    }
+
+    /* Everything beside the label - the control markup itself, whatever shape
+       it takes - claims the rest of the row. */
+    .formable-form--labels-left
+      .formable-field:has(> .formable-field__label)
+      > :not(
+        .formable-field__label,
+        .formable-field__instructions,
+        .formable-field__errors
+      ) {
+      flex: 1 1 0;
+      min-width: 0;
+    }
+
+    /* Instructions and errors read across the full row instead of squeezing
+       into the control's column, indented to sit under the control rather
+       than under the label. */
+    .formable-form--labels-left
+      .formable-field:has(> .formable-field__label)
+      > .formable-field__instructions,
+    .formable-form--labels-left
+      .formable-field:has(> .formable-field__label)
+      > .formable-field__errors {
+      flex-basis: 100%;
+      margin-inline-start: calc(
+        var(--formable-label-width) + var(--formable-space-4)
+      );
+    }
+  }
+
+  /* ------------------------------------------------------------------ inputs */
+
+  /* `border-box` so a text `<input>` (`content-box` by default) and a
+     `<select>` (`border-box`) resolve to the same outer height from the same
+     padding, and `min-height` gives every control one common floor - a select
+     and the text input beside it in a row used to be visibly different
+     heights. `.formable-input--textarea` raises the floor to fit its rows;
+     checkbox and radio opt out. `inline-size` is layout, not paint - it used
+     to live in the theme layer alone, so a `reset`/`contract` site (no
+     `formable-theme.css` loaded) got no control width at all and a `<select>`
+     with long options overflowed its row. See
+     [[frontend-embeddability-review]] chunk 9 (M5). */
+  .formable-input {
+    box-sizing: border-box;
+    inline-size: 100%;
+    min-height: var(--formable-control-height);
+  }
+
+  .formable-input--checkbox,
+  .formable-input--radio {
+    inline-size: auto;
+    min-height: 0;
+    margin-inline-end: var(--formable-space-2);
+  }
+
+  /* `rows` already sizes the textarea natively, but browsers derive that from
+     font metrics alone and undershoot once padding and border are added -
+     `textarea.twig` mirrors the field's `rows` setting into this custom
+     property so the min-height calc below accounts for both. */
+  .formable-input--textarea {
+    min-height: calc(
+      var(--formable-textarea-rows, 4) * 1lh + 2 *
+        var(--formable-control-padding-y) + 2 * var(--formable-border-width)
+    );
+    resize: vertical;
+  }
+
+  /* --------------------------------------------------------------- multi-select */
+
+  /* Built by `multi-select.ts`; a plain wrapper around the native `<select>`
+     until then. `__control` is the visible box a visitor types into - a flex
+     row so chips wrap onto their own lines while the search input keeps
+     growing to fill whatever's left of the row. `:has(:focus-visible)` rings
+     the whole control rather than just the borderless search input inside
+     it, the same way a native input's own focus ring would - `:has()` is
+     already load-bearing elsewhere in this stylesheet (`.formable-option:has(
+     .formable-input[disabled])` above). */
+  .formable-multiselect {
+    position: relative;
+  }
+
+  .formable-multiselect__control {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--formable-space-2);
+    box-sizing: border-box;
+    min-height: var(--formable-control-height);
+    padding: calc(var(--formable-control-padding-y) / 2)
+      var(--formable-control-padding-x);
+    cursor: text;
+  }
+
+  .formable-multiselect__control:has(:focus-visible) {
+    outline-style: solid;
+    outline-width: var(--formable-focus-ring-width);
+    outline-offset: var(--formable-focus-ring-offset);
+  }
+
+  /* Same `:has()`-support fallback as the option row (`formable-contract.css`)
+     and the file dropzone (`formable-theme.css`) - `:focus-within` reaches
+     the control from the same focused-search-input condition, for a browser
+     old enough to miss `:has()`. See
+     [[frontend-embeddability-review]] chunk 10 (L1). */
+  @supports not selector(:has(*)) {
+    .formable-multiselect__control:focus-within {
+      outline-style: solid;
+      outline-width: var(--formable-focus-ring-width);
+      outline-offset: var(--formable-focus-ring-offset);
+    }
+  }
+
+  .formable-multiselect__chips {
+    display: contents;
+  }
+
+  .formable-multiselect__chip {
+    display: flex;
+    align-items: center;
+    gap: var(--formable-space-1);
+    padding-inline-start: var(--formable-space-2);
+  }
+
+  .formable-multiselect__chip-remove {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 1.25rem;
+    height: 1.25rem;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    font: inherit;
+    line-height: 1;
+    cursor: pointer;
+  }
+
+  /* A 20px target is well under the 44px minimum a coarse (touch) pointer
+     needs to hit reliably - a mouse cursor doesn't have that problem, which
+     is why this stays behind the media feature rather than becoming the
+     control's default size. See [[frontend-embeddability-review]] chunk 10
+     (L2). */
+  @media (pointer: coarse) {
+    .formable-multiselect__chip-remove {
+      width: 2.75rem;
+      height: 2.75rem;
+    }
+  }
+
+  /* Borderless and transparent - `__control` already paints the box this
+     sits inside, so a second border/background here would nest one input
+     look inside another. `flex: 1 1 6rem` lets it fill the row after the
+     chips wrap, while `min-width` keeps it from collapsing to nothing once a
+     few chips have taken most of the space. */
+  .formable-multiselect__search {
+    flex: 1 1 6rem;
+    min-width: 6rem;
+    padding: 0;
+    border: 0;
+    outline: none;
+    background: transparent;
+    font: inherit;
+  }
+
+  /* `50dvh` alongside the fixed `16rem` ceiling: the dynamic viewport unit is
+     what actually shrinks once the on-screen keyboard claims the lower half
+     of a phone screen, where `vh` (and a fixed rem alone) would keep
+     reserving room behind the keyboard instead of fitting above it. See
+     [[frontend-embeddability-review]] chunk 9 (M7). */
+  .formable-multiselect__listbox {
+    position: absolute;
+    z-index: 1;
+    inset-inline: 0;
+    inset-block-start: calc(100% + var(--formable-space-1));
+    max-block-size: min(16rem, 50dvh);
+    overflow-y: auto;
+    margin: 0;
+    padding: var(--formable-space-1);
+    list-style: none;
+  }
+
+  /* `multi-select.ts` adds this when it measures too little room below the
+     control - a sidebar near the foot of the page, a control near the bottom
+     of a modal, the keyboard covering the lower half of a phone viewport -
+     and flips the popup to open upward instead. */
+  .formable-multiselect--flip .formable-multiselect__listbox {
+    inset-block: auto calc(100% + var(--formable-space-1));
+  }
+
+  .formable-multiselect__listbox[hidden] {
+    display: none;
+  }
+
+  .formable-multiselect__option {
+    padding: var(--formable-space-2);
+    border-radius: var(--formable-radius-sm);
+  }
+
+  .formable-multiselect__option--selectable {
+    cursor: pointer;
+  }
+
+  .formable-multiselect__option--disabled {
+    cursor: not-allowed;
+  }
+
+  .formable-multiselect__empty {
+    margin: 0;
+    padding: var(--formable-space-2);
+  }
+
+  .formable-multiselect__empty[hidden] {
+    display: none;
+  }
+
+  .formable-options {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+  }
+
+  .formable-options--horizontal {
+    flex-flow: row wrap;
+    gap: var(--formable-space-4);
+  }
+
+  /* Align the box to the first line of the label rather than the vertical centre
+     of the whole block. `agree.twig`'s label is rich text (`field.description`)
+     that routinely wraps to several lines and the checkbox must sit against the
+     first line. `margin-top` nudges the native control onto the text baseline.
+     The native box stays its ~13px browser size (resizing it would undo that
+     alignment), but the clickable/hoverable row grows past it: padding expands
+     the box, the matching negative margin pulls its outer edge back to where
+     it was, so the row eats into `.formable-options`'s gap without shifting
+     the checkbox or widening the list - `formable-theme.css` paints the hover
+     state this creates. */
+
+  /* Block axis only: cancelling the padding on the inline axis too (this used
+     to be a single `margin`/`padding` shorthand, all four sides) bought
+     nothing - `.formable-options`'s default `align-items: stretch` already
+     clamps every option's border-box width to the container's own, so
+     padding alone insets the content without widening the row. What the
+     inline negative margin *did* do was push that same border-box past the
+     container's own edges by `--formable-space-2` on both sides, with no
+     padding anywhere between it and a host's own scroll container to land
+     in - the overflow a zero-padding sidebar or modal then clipped. See
+     [[frontend-embeddability-review]] chunk 10 (L4). */
+  .formable-option {
+    display: flex;
+    align-items: flex-start;
+    margin-block: calc(var(--formable-space-2) * -1);
+    padding: var(--formable-space-2);
+    cursor: pointer;
+  }
+
+  .formable-option:has(.formable-input[disabled]) {
+    cursor: not-allowed;
+  }
+
+  .formable-option .formable-input--checkbox,
+  .formable-option .formable-input--radio {
+    margin-block-start: 0.2em;
+    flex-shrink: 0;
+  }
+
+  /* The Agree label can be a multi-paragraph consent statement; drop the leading
+     margin on its first block so it lines up with the checkbox. */
+  .formable-option--agree .formable-option__label > *:first-child {
+    margin-block-start: 0;
+  }
+
+  /* -------------------------------------------------------------- state hooks */
+
+  .formable-form__errors[hidden] {
+    display: none;
+  }
+
+  /* `setSubmitting()` in `main.ts` toggles this class on every submit. Freeze
+     the step area while a request is in flight so a second click can't fire;
+     the scope to `[data-formable-step]` keeps the error summary and success
+     message interactive. The step used to dim to 0.6 opacity here too, but
+     that both hid the content the submitter might want to re-read and dropped
+     contrast below AA for the time it was showing - the busy signal now lives
+     on the button itself (formable-theme.css). Cursor and pointer-events are
+     state signals, not paint - a reset-only site still gets the
+     frozen-while-submitting behaviour. */
+  .formable-form--submitting {
+    cursor: progress;
+  }
+
+  .formable-form--submitting [data-formable-step] {
+    pointer-events: none;
+  }
+
+  /* A nav button disabled mid-submit: the request is in flight, so the cursor
+     says wait. The two rules below carry the same specificity and come after
+     deliberately - the signature and table controls are `.formable-button`s
+     too now, and theirs is an ordinary limit, not a pending request. */
+  .formable-button[disabled] {
+    opacity: 0.6;
+    cursor: progress;
+  }
+
+  /* Disabled while the pad is empty - there is nothing to clear yet. */
+  .formable-signature__clear[disabled] {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* Disabled at the row limits: at `maxRows` for add, at `minRows` for remove. */
+  .formable-table__add[disabled],
+  .formable-table__remove[disabled] {
+    opacity: 0.5;
+    cursor: default;
+  }
+
+  /* ----------------------------------------------------------------- actions */
+
+  /* Back pushes to the start edge, the forward action (Next/Submit) sits after
+     it, and the save block keeps its own `margin-inline-start: auto` at the far
+     end. Which button looks primary is the theme's business (the
+     `.formable-button` variants); the auto margin below is placement, so it
+     belongs here and works for a reset-only site too.
+
+     `margin-block-start` reuses the page's own row rhythm rather than
+     leaving this gap to the captcha widget below - `[data-formable-step]`
+     stacks its children (progress, page, captcha, actions) with no gap of
+     its own, so a form with no captcha had nothing setting the space above
+     Submit at all, and one with a captcha only got it as a side effect of
+     that widget's margin. Block margins between these siblings collapse, so
+     a captcha's own bottom margin (`--formable-space-5`, smaller) never adds
+     to this one - the gap above the actions row is this token's value
+     either way. */
+  .formable-form__actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: var(--formable-space-4);
+    margin-block-start: var(--formable-group-gap);
+  }
+
+  .formable-button--back {
+    margin-inline-end: auto;
+  }
+
+  /* Full width, stacked, in the row's own reading order (back still first)
+     rather than side by side - two ~44px targets sharing a narrow row get
+     cramped fast, and a phone has the vertical room a desktop row doesn't.
+     The inline `auto` margins above are a cross-axis margin once the
+     container's turned onto its side, which would pull the back button and
+     the save block to one edge instead of letting them stretch full width -
+     reset directly on the children rather than narrowed by a class list, so
+     a future action added to this row doesn't have to remember to opt in.
+     See [[frontend-embeddability-review]] chunk 9. */
+  @container formable-step (inline-size < 40rem) {
+    .formable-form__actions {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .formable-form__actions > * {
+      margin-inline: 0;
+    }
+  }
+
+  /* The captcha widget sits between the fields and the submit button. */
+  .formable-captcha {
+    margin: var(--formable-space-5) 0;
+  }
+
+  .formable-captcha__noscript {
+    margin: var(--formable-space-3) 0;
+  }
+
+  /* ------------------------------------------------------------------- progress */
+
+  .formable-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-3);
+  }
+
+  /* Stacked in a narrow container, side by side from the row threshold up.
+     Each step names its page now, and six of those never fit across a
+     narrow container - stacking is what keeps a long form's indicator
+     readable instead of wrapping it into a ragged grid. `--formable-space-4`
+     is the distance the theme's connector line has to cover between one
+     circle and the next; the two are read together. A container query, not
+     a viewport one - a horizontal stepper only makes sense once the step
+     itself has the room, regardless of how wide the surrounding page is. See
+     [[frontend-embeddability-review]] chunk 5. */
+  .formable-progress__steps {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-4);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .formable-progress__step {
+    display: flex;
+    align-items: center;
+    gap: var(--formable-space-3);
+  }
+
+  @container formable-step (inline-size >= 40rem) {
+    .formable-progress__steps {
+      flex-direction: row;
+    }
+
+    /* Equal columns - `flex: 1 1 0`, not `auto` - because the theme draws the
+       connector as a multiple of an item's own width, which only reaches the
+       next circle while every item is the same size. `min-width: 0` lets a long
+       page name wrap inside its column rather than widening it. */
+    .formable-progress__step {
+      flex: 1 1 0;
+      min-width: 0;
+      flex-direction: column;
+      align-items: center;
+      gap: var(--formable-space-2);
+      text-align: center;
+    }
+  }
+
+  /* Collapses the full step list down to the label alone - `_progress.twig`
+     has already folded the current page's name into it, so nothing is lost.
+     Two independent triggers: a narrow container (a 6-step form otherwise
+     stacks ~40px per step, pushing the first field of a phone-width page
+     ~240px down before it's reached) or `--compact` (`_progress.twig`'s own
+     `total >= 8`, so a long stepper collapses even where the container has
+     the width to spare). See [[frontend-embeddability-review]] chunk 9 (L3). */
+  @container formable-step (inline-size < 40rem) {
+    .formable-progress__steps {
+      display: none;
+    }
+  }
+
+  .formable-progress--compact .formable-progress__steps {
+    display: none;
+  }
+
+  /* --------------------------------------------------------------------- review */
+
+  .formable-review {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-section-gap);
+  }
+
+  .formable-review__page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--formable-space-4);
+    margin-block-end: var(--formable-space-4);
+  }
+
+  .formable-review__answers {
+    margin: 0;
+    display: grid;
+    gap: var(--formable-space-3);
+  }
+
+  /* `min-inline-size: 0` on the grid items - a grid item's default intrinsic
+     minimum is its content's own min-content size, which for an unbreakable
+     token (a long URL as a review answer) can exceed the `1fr`/`2fr` track it
+     was given and blow out the grid. `overflow-wrap: anywhere` (the form
+     root, above) still does the actual breaking; this just lets the track
+     shrink to make room for it. See [[frontend-embeddability-review]]
+     chunk 9 (M6). */
+  .formable-review__answer {
+    display: grid;
+    gap: var(--formable-space-4);
+  }
+
+  .formable-review__question,
+  .formable-review__value {
+    min-inline-size: 0;
+  }
+
+  /* One column in a narrow container so the answer isn't squeezed; the
+     label/value split only kicks in where the step has room, at the same
+     threshold `.formable-row`'s explicit-width variant uses. See
+     [[frontend-embeddability-review]] chunk 5. */
+  @container formable-step (inline-size >= 40rem) {
+    .formable-review__answer {
+      grid-template-columns: minmax(8rem, 1fr) 2fr;
+    }
+  }
+
+  /* --------------------------------------------------------------- save & resume */
+
+  .formable-save {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: var(--formable-space-3);
+    margin-inline-start: auto;
+  }
+
+  /* ---------------------------------------------------------------- file upload */
+
+  /* The wrapper is a plain block until `file-upload.ts` claims it; only then
+     does it stack a dropzone and a per-file list, so the layout rules are
+     scoped to the enhanced state. Unenhanced, the input renders exactly where
+     the server put it - visible, with its own `::file-selector-button` (see
+     `formable-theme.css`) - which is what a visitor with JavaScript off, or a
+     browser predating `DataTransfer`, still gets. */
+  .formable-file--enhanced {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+  }
+
+  /* The dropzone itself - built by the enhancer around the (now invisible,
+     stretched) native input, see `file-upload.ts`. `position: relative` makes
+     it the input's containing block; the input is the last child so it paints
+     on top and keeps receiving every click and keystroke, with the icon and
+     prompt beneath it purely decorative. */
+  .formable-file__dropzone {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--formable-space-2);
+    padding: var(--formable-space-6) var(--formable-space-4);
+    text-align: center;
+  }
+
+  .formable-file__dropzone .formable-input--file {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    opacity: 0;
+    cursor: pointer;
+  }
+
+  .formable-file__icon {
+    width: var(--formable-space-6);
+    height: var(--formable-space-6);
+  }
+
+  .formable-file__prompt,
+  .formable-file__notice {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* One polite status region per enhanced field (`file-upload.ts`, `table.ts`,
+     `multi-select.ts`, `signature.ts`) - a row, file or chip changing, or a
+     signature being captured or cleared. Distinct from `.formable-file__notice`
+     above, which is specifically the rejected-file warning and stays styled as
+     an error. */
+  .formable-field__notice {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+  }
+
+  .formable-field__notice[hidden] {
+    display: none;
+  }
+
+  /* Built by the enhancer - one row per chosen file. Never present without
+     JavaScript, so it carries its own list reset rather than inheriting the
+     bullet list `formable-theme.css` would otherwise give a `<ul>`. */
+  .formable-field__files {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+  }
+
+  .formable-field__file {
+    display: flex;
+    align-items: center;
+    gap: var(--formable-space-3);
+  }
+
+  .formable-field__file-thumb {
+    flex-shrink: 0;
+    width: var(--formable-control-height);
+    height: var(--formable-control-height);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    object-fit: cover;
+  }
+
+  .formable-field__file-thumb--icon svg {
+    width: var(--formable-space-5);
+    height: var(--formable-space-5);
+  }
+
+  /* The name and its progress bar stack; this is what actually grows to fill
+     the row, so the thumbnail and remove button either side keep a fixed
+     size. */
+  .formable-field__file-info {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-1);
+  }
+
+  .formable-field__file-name {
+    overflow-wrap: anywhere;
+  }
+
+  /* Only meaningful while a request is in flight - `formable-theme.css` shows
+     it exclusively under `.formable-form--submitting`, the same state the
+     step buttons already key off (`internal/decisions/0038`). */
+  .formable-field__file-progress {
+    display: none;
+  }
+
+  .formable-form--submitting .formable-field__file-progress {
+    display: block;
+  }
+
+  .formable-field__file-progress-bar {
+    height: 100%;
+    width: 0%;
+    border-radius: inherit;
+    transition: width var(--formable-duration-base) var(--formable-ease);
+  }
+
+  /* ------------------------------------------------------------------ signature */
+
+  .formable-signature {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--formable-space-3);
+  }
+
+  /* Fills the row up to the field's own configured width and no wider, and
+     keeps its aspect ratio while doing it - `signature.ts` sets both custom
+     properties from the field's `canvasWidth`/`canvasHeight` and rescales the
+     backing store to match whatever this resolves to. Without `aspect-ratio`
+     a narrower `inline-size` alone would leave `height` at its native attribute
+     value, squashing the drawing rather than shrinking it in proportion. The
+     `2` fallback is the system's own default ratio (400×200), for the rare
+     case this rule applies before the script has run at all. `border-box` so the
+     border `formable-theme.css` paints on it resolves inside that `100%`
+     rather than on top of it: a canvas is `content-box` by default, which
+     left the pad 2px wider than its container and put a horizontal scrollbar
+     back in the 280px sidebar chunk 14 had just cleared
+     ([[frontend-embeddability-review]] chunk 14, N2). See
+     [[frontend-embeddability-review]] chunk 9 (M4). */
+  .formable-signature__canvas {
+    box-sizing: border-box;
+    inline-size: 100%;
+    max-inline-size: var(--formable-signature-width, 400px);
+    aspect-ratio: var(--formable-signature-ratio, 2);
+  }
+
+  /* ---------------------------------------------------------------------- table */
+
+  /* A wide table doesn't fit a phone; the auto-layout table below has an
+     intrinsic minimum width (the sum of its columns' min-content widths) that
+     `width: 100%` can't shrink past, so this scrolls instead of crushing cells
+     unreadably thin. The shadow hint that tells a visitor there's more to
+     scroll to is paint, so it lives in the theme layer instead. */
+  .formable-table-scroll {
+    overflow-x: auto;
+  }
+
+  /* Screen-reader-only by default - `table.twig`'s per-cell label is
+     redundant to sighted people while the column header row is visible. Not
+     the shared `.formable-visually-hidden` utility: that one is hardened
+     with `!important` against hostile host CSS (chunk 4) and must stay that
+     way, where this is Formable's own rule un-hiding its own label under a
+     condition it controls. Made visible again below once the table itself
+     becomes a stack of cards with no header row to read the column name
+     from. See [[frontend-embeddability-review]] chunk 9. */
+  .formable-table__cell-label {
+    position: absolute;
+    inline-size: 1px;
+    block-size: 1px;
+    margin: -1px;
+    padding: 0;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .formable-table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+
+  /* End-edge padding is the column gutter (the last cell's trailing gutter sits
+     between it and the JS-inserted remove control); top/bottom padding is half
+     the row-to-row gap, so cells collapse to `2 * space-3` between rows rather
+     than butting their inputs straight together. */
+  .formable-table th,
+  .formable-table td {
+    padding-block: var(--formable-space-3);
+    padding-inline: 0 var(--formable-space-4);
+    text-align: start;
+    vertical-align: middle;
+  }
+
+  /* The header sits directly under the field legend - no reason to push the
+     first row of inputs down with matching top padding. */
+  .formable-table th {
+    padding-block-start: 0;
+  }
+
+  .formable-table__add {
+    margin-block-start: var(--formable-space-3);
+  }
+
+  /* A grid of columns doesn't fit a narrow container the way a single-column
+     form field does - unlike `.formable-row`'s intrinsic `auto-fit`, a
+     table's columns are meant to line up, so there's no equivalent
+     reflow that doesn't also lose the alignment that makes it a table.
+     Below the row threshold, each row becomes its own card instead: the
+     header row (redundant once every cell names itself) is dropped, and the
+     per-cell label above becomes each field's visible label. The scroll
+     wrapper's `overflow-x: auto` above is harmless here - a column of
+     full-width cards has nothing left to scroll to. See
+     [[frontend-embeddability-review]] chunk 9. */
+  @container formable-step (inline-size < 40rem) {
+    .formable-table,
+    .formable-table tbody {
+      display: block;
+      inline-size: 100%;
+    }
+
+    .formable-table thead {
+      display: none;
+    }
+
+    .formable-table tr {
+      display: flex;
+      flex-direction: column;
+      gap: var(--formable-space-2);
+    }
+
+    .formable-table td {
+      display: block;
+      padding: 0;
+    }
+
+    .formable-table__cell-label {
+      position: static;
+      inline-size: auto;
+      block-size: auto;
+      margin: 0;
+      padding: 0;
+      overflow: visible;
+      clip-path: none;
+      white-space: normal;
+      display: block;
+    }
+  }
+}

@@ -1,0 +1,157 @@
+{#
+ # One preview scenario, as a bare standalone document - no shell chrome, so
+ # this is the URL Playwright will eventually point at directly. Beyond
+ # `craft.formable.renderForm()`'s own styles, this document carries:
+ #
+ # - a page background and padding, keyed to `--formable-surface-raised` by
+ #   default so it repaints with whatever scheme the form itself is showing;
+ #   `pageBackground: white` opts out of that, for `embed-light-host-dark-os`
+ #   ([[frontend-embeddability-review]] chunk 1, step 3) - a real host page
+ #   does not know or care what colour Formable's own tokens resolve to.
+ # - an optional `host` CSS fixture, approximating one specific hostile host
+ #   stylesheet, never a real dependency (step 2).
+ # - an optional sized wrapper (`width`) or layout chrome (`chrome`: a
+ #   width-to-content `<dialog>`, a zero-padding `overflow: auto` sidebar, or
+ #   a flex-column/grid host - the shapes N3 in
+ #   [[frontend-embeddability-review]] chunk 14 found `.formable-form`'s own
+ #   `margin-inline: auto` losing its fill-width default in) around the
+ #   rendered form (steps 1 and 4).
+ # - `dir` on `<html>`, for the RTL scenario (step 3).
+ #
+ # `head()` / `beginBody()` / `endBody()` are what turn `renderForm()`'s
+ # registered asset bundles into real `<link>`/`<script>` tags - they only
+ # resolve when the controller renders through `View::renderPageTemplate()`,
+ # not the plain `renderTemplate()`.
+ #
+ # Variables:
+ #   form                the scenario's Form element
+ #   options              renderForm() options for this scenario
+ #   scenario             the full scenario entry - key, label, group, form, options
+ #   scheme               light | dark | system
+ #   theme                none | reset | default
+ #   density              comfortable | compact - already applied to `form`'s settings
+ #   width                full | 280 | 400 | 600 | 960
+ #   host                 none | tailwind-v3 | tailwind-v4 | bootstrap5 | prose | font-62
+ #   dir                  ltr | rtl
+ #   chrome               none | dialog | sidebar | flex-column | grid
+ #   pageBackground       derived | white
+ #   synthesizeDisabled   whether the "disabled" field state has to be faked
+ #}
+{% set forcedScheme = scheme in ['light', 'dark'] %}
+{% set htmlAttributes = {
+    lang: craft.app.language,
+    dir: dir,
+    'data-formable-scheme': forcedScheme ? scheme : null,
+    'data-preview-scenario': scenario.key,
+    'data-preview-scheme': scheme,
+    'data-preview-theme': theme,
+    'data-preview-width': width,
+    'data-preview-host': host,
+    'data-preview-chrome': chrome,
+} %}
+{#
+ # Hand-rolled, not a vendored copy of the real library: each block is only
+ # the handful of rules known to break a Formable default (see the findings
+ # behind [[frontend-embeddability-review]] H3), kept deliberately small so
+ # this stays a fixture rather than a dependency.
+ #}
+{% set hostFixtures = {
+    'tailwind-v3': '*, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; border-color: #e5e7eb; }
+button { background-color: transparent; background-image: none; }
+button, input, select, textarea { font: inherit; color: inherit; }
+ul, ol { list-style: none; margin: 0; padding: 0; }
+h1, h2, h3, h4, h5, h6 { font-size: inherit; font-weight: inherit; margin: 0; }',
+    'tailwind-v4': '@layer base {
+  *, ::before, ::after { box-sizing: border-box; border-width: 0; border-style: solid; }
+  button { background-color: transparent; }
+  ul, ol { list-style: none; margin: 0; padding: 0; }
+}',
+    'bootstrap5': '*, *::before, *::after { box-sizing: border-box; }
+legend { float: left; width: 100%; margin-bottom: .5rem; font-size: 1.5rem; }
+fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+ul, ol { padding-left: 2rem; }',
+    'prose': '.prose { color: #374151; max-width: 65ch; }
+.prose :where(ul, ol) { margin-top: 1.25em; margin-bottom: 1.25em; padding-left: 1.625em; }
+.prose :where(ul) { list-style-type: disc; }
+.prose :where(p) { margin-top: 1.25em; margin-bottom: 1.25em; }
+.prose :where(label) { position: relative; }',
+    'font-62': 'html { font-size: 62.5%; }',
+} %}
+<!DOCTYPE html>
+<html{{ attr(htmlAttributes) }}>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ scenario.label }} · Formable preview</title>
+    {{ head() }}
+    <style>
+        body {
+            margin: 0;
+            padding: 2rem;
+            background: {{ pageBackground == 'white' ? '#fff' : 'var(--formable-surface-raised, #f4f4f5)' }};
+        }
+        {% if width != 'full' %}
+        [data-preview-target] {
+            width: {{ width }}px;
+            margin-inline: auto;
+        }
+        {% endif %}
+        {% if chrome == 'sidebar' %}
+        [data-preview-target] {
+            padding: 0;
+            overflow: auto;
+            max-height: 80vh;
+            border: 1px dashed #a1a1aa;
+        }
+        {% endif %}
+        {% if chrome == 'flex-column' %}
+        [data-preview-target] {
+            display: flex;
+            flex-direction: column;
+            border: 1px dashed #a1a1aa;
+        }
+        {% endif %}
+        {% if chrome == 'grid' %}
+        [data-preview-target] {
+            display: grid;
+            border: 1px dashed #a1a1aa;
+        }
+        {% endif %}
+        {% if host != 'none' %}
+        {{ hostFixtures[host]|raw }}
+        {% endif %}
+    </style>
+</head>
+<body>
+    {{ beginBody() }}
+    {% set targetAttributes = {
+        'data-preview-target': true,
+        class: host == 'prose' ? 'prose' : null,
+    } %}
+    {% if chrome == 'dialog' %}
+    <dialog open{{ attr(targetAttributes) }}>
+        {{ craft.formable.renderForm(form, options) }}
+    </dialog>
+    {% else %}
+    <div{{ attr(targetAttributes) }}>
+        {{ craft.formable.renderForm(form, options) }}
+    </div>
+    {% endif %}
+    {% if synthesizeDisabled %}
+        {#
+         # `disabled` is the state the client-side conditions engine
+         # (`conditions-dom.ts`) puts a field into once it's also hidden - not
+         # something a screenshot can show. This scenario wants the visible
+         # half of that pairing, so it fakes just the `disabled` the real
+         # engine would set on each control, without the `hidden` it always
+         # comes with.
+         #}
+        <script>
+            document
+                .querySelectorAll('[data-preview-target] [data-formable-field] input, [data-preview-target] [data-formable-field] select, [data-preview-target] [data-formable-field] textarea')
+                .forEach(function (control) { control.disabled = true; });
+        </script>
+    {% endif %}
+    {{ endBody() }}
+</body>
+</html>

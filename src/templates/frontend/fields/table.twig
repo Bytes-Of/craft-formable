@@ -1,0 +1,83 @@
+{% set rows = value ?? [] %}
+{% set minRows = field.minRows ?? 1 %}
+{% set rowCount = max(rows|length, minRows) %}
+{# The row bounds and the two label strings ride along as data attributes
+ # because the front-end bundle owns everything the server can't render: adding
+ # a row, removing one, and renaming the rows that shift as a result. Keeping
+ # the labels here rather than in JavaScript keeps them translatable -
+ # `__COLUMN__` and `__ROW__` are placeholders the bundle substitutes. #}
+{# A 5-column table doesn't fit a phone. The wrapper scrolls horizontally
+ # rather than the table shrinking its cells unreadably thin - `formable-
+ # theme.css` paints a shadow hint on its edges so a visitor can tell there's
+ # more to scroll to. #}
+<div class="formable-table-scroll">
+<table class="formable-table" data-formable-table
+    data-min-rows="{{ minRows }}"
+    {%- if field.maxRows %} data-max-rows="{{ field.maxRows }}"{% endif %}
+    data-row-label="{{ '{column}, row {row}'|t('formable', { column: '__COLUMN__', row: '__ROW__' }) }}"
+    data-remove-label="{{ 'Remove row'|t('formable') }}"
+    data-row-added-label="{{ 'Row added'|t('formable') }}"
+    data-row-removed-label="{{ 'Row removed'|t('formable') }}"
+    {{ field.staticRows ? 'data-static' : '' }}>
+    <thead>
+        <tr>
+            {#- `width` is an admin-entered CSS length in any unit -
+               `renderStyleVars()` in `main.ts` applies it via the CSSOM (CSP),
+               not an inline `style`. Without JavaScript, columns fall back to
+               the browser's own auto layout instead of the author's chosen
+               widths. #}
+            {% for column in field.columns %}
+                <th scope="col" {% if column.width %}data-width="{{ column.width }}"{% endif %}>{{ column.label }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for rowIndex in 0..(rowCount - 1) %}
+            {% set row = rows[rowIndex] ?? {} %}
+            <tr>
+                {% for column in field.columns %}
+                    {% set cellId = "#{inputId}-#{rowIndex}-#{column.handle}" %}
+                    {% set cellName = "#{inputName}[#{rowIndex}][#{column.handle}]" %}
+                    <td>
+                        {# Each cell needs its own accessible name; the column
+                         # header alone isn't announced for inputs. Screen-reader-only
+                         # by default (`formable-table__cell-label` in
+                         # `formable-reset.css`) - a narrow container turns the table
+                         # into a stack of per-row cards with no header row to read the
+                         # column name from, and this same label is what becomes visible
+                         # there instead. Not the shared `.formable-visually-hidden`
+                         # utility: that one is hardened with `!important` against
+                         # hostile host CSS ([[frontend-embeddability-review]] chunk 4)
+                         # and must never be un-hidden by Formable's own rules. #}
+                        <label class="formable-table__cell-label" for="{{ cellId }}">
+                            {{ '{column}, row {row}'|t('formable', { column: column.label, row: rowIndex + 1 }) }}
+                        </label>
+                        {% if column.type == 'select' %}
+                            <select id="{{ cellId }}" name="{{ cellName }}" class="formable-input">
+                                <option value=""></option>
+                                {% for option in column.options %}
+                                    <option value="{{ option }}" {{ (row[column.handle] ?? '') == option ? 'selected' : '' }}>{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elseif column.type == 'checkbox' %}
+                            <input type="checkbox" id="{{ cellId }}" name="{{ cellName }}" value="1"
+                                class="formable-input" {{ (row[column.handle] ?? false) ? 'checked' : '' }}>
+                        {% else %}
+                            <input type="{{ column.type == 'number' ? 'number' : (column.type == 'email' ? 'email' : (column.type == 'url' ? 'url' : 'text')) }}"
+                                id="{{ cellId }}" name="{{ cellName }}" class="formable-input"
+                                value="{{ row[column.handle] ?? '' }}">
+                        {% endif %}
+                    </td>
+                {% endfor %}
+            </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+{% if not field.staticRows %}
+    <button type="button"
+        class="formable-button formable-button--secondary formable-button--sm formable-table__add"
+        data-formable-table-add>
+        {{ field.addRowLabel ?: 'Add a row'|t('formable') }}
+    </button>
+{% endif %}

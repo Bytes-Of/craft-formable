@@ -1,0 +1,17 @@
+{# `field.selectableElements` resolves the field's configured sources against
+ # a live Craft query - see RelationFormField::getSelectableElements(). #}
+{% set selected = value ?? [] %}
+<select id="{{ inputId }}"
+    name="{{ inputName }}[]"
+    class="formable-input formable-input--relation"
+    {%- if field.limit != 1 %} multiple{% endif %}
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>
+    {% if field.limit == 1 %}
+        <option value="">{{ field.selectionLabel ?: 'Select one'|t('formable') }}</option>
+    {% endif %}
+    {% for element in field.selectableElements %}
+        <option value="{{ element.id }}" {{ element.id in selected ? 'selected' : '' }}>{{ element.title }}</option>
+    {% endfor %}
+</select>

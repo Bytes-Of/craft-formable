@@ -1,0 +1,61 @@
+{#
+ # The closing half of the form shell: whatever follows the author's own field
+ # markup, down through `</form>`. Paired with `_shellOpen.twig`, which opens
+ # what this closes.
+ #
+ # `form.twig` includes this below its `<div data-formable-step>`, with
+ # `showCaptcha`/`showNav` both off - `_step.twig` already renders its own
+ # captcha and nav for the current step. The shell path turns both on, since
+ # nothing else in its flat page renders them. See internal/decisions/0093.
+ #
+ # Variables:
+ #   accepting     whether the form is currently accepting submissions;
+ #                 defaults to true, matching `_shellOpen.twig` - `form.twig`
+ #                 never sees the closed branch below, `renderForm()` already
+ #                 returns `renderClosed()` before reaching here
+ #   showCaptcha   whether to render the captcha challenge here - the shell's
+ #                 flat page has no `_step.twig` to render it for the final
+ #                 (only) step
+ #   showNav       whether to render the submit button here, for the same
+ #                 reason
+ #   spam          the form's front-end spam config, or not set - read for
+ #                 `spam.captcha` when `showCaptcha` is on
+ #   form          Form element (for `_nav`)
+ #   settings      FormSettings, already localized to the current site
+ #                 ({@see \bytesof\formable\services\Translations::localizeSettings()})
+ #   formId        this render's unique form id (see `form.twig`) - namespaces
+ #                 the resume-email input `_nav` renders
+ #   templatePath  the form's template override directory, or null
+ #}
+{% set accepting = accepting ?? true %}
+{% if not accepting %}
+    </div>
+{% else %}
+    {# The captcha challenge belongs to the real submit, and the shell's flat
+       page has exactly one step, so - unlike `_step.twig`, which only reaches
+       this for the final step of several - `showCaptcha` alone decides it. #}
+    {% if showCaptcha and spam is defined and spam and spam.captcha %}
+        {{ include(craft.formable.template('_captcha', templatePath), {
+            captcha: spam.captcha,
+        }, with_context = false) }}
+    {% endif %}
+
+    {% if showNav %}
+        {# A flat page is always its own final step: one Submit button, no
+           Back, no review. `_nav.twig`'s own `isFinalStep` (`isReview or
+           (isLastPage and not showReview)`) resolves true from `isReview:
+           false` and `isLastPage: true` with `showReview: false` alone. #}
+        {{ include(craft.formable.template('_nav', templatePath), {
+            form: form,
+            settings: settings,
+            isMultiPage: false,
+            isReview: false,
+            isFirstStep: true,
+            isLastPage: true,
+            showReview: false,
+            formId: formId,
+        }, with_context = false) }}
+    {% endif %}
+
+    </form>
+{% endif %}

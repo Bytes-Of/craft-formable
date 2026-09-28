@@ -1,0 +1,680 @@
+{% import '_includes/forms' as forms %}
+{% import 'formable/_includes/upgradeBadge' as upgrade %}
+{{ upgrade.styles() }}
+
+{# Editions / license
+ #
+ # Craft manages plugin license keys itself (via the Plugin Store and the
+ # licence-key field it renders around this settings page), so this section is
+ # purely informational: the active edition, what each edition includes, and a
+ # call-to-action into the Plugin Store. The upgrade prompts elsewhere in the CP
+ # deep-link to the `#formable-editions` anchor below.
+ #}
+{% set proFeatures = [
+    'Conditional logic (show/hide fields and pages by answer)'|t('formable'),
+    'Scheduled forms & submission limits'|t('formable'),
+    'Save & resume partially-completed submissions'|t('formable'),
+    'Launch integrations - Slack, Mailchimp, HubSpot, Webhook'|t('formable'),
+    'Captchas - reCAPTCHA, hCaptcha, Turnstile'|t('formable'),
+    'Automatic data-retention purging'|t('formable'),
+    'Weekly digest emails'|t('formable'),
+    'Submission edit history'|t('formable'),
+    'Front-end member submissions & the GraphQL API'|t('formable'),
+] %}
+{% set liteFeatures = [
+    'Unlimited forms, fields & multi-page layouts'|t('formable'),
+    'Email notifications with conditions'|t('formable'),
+    'Spam protection - honeypot, keywords, IP blocking'|t('formable'),
+    'File uploads & submission management'|t('formable'),
+    'CSV / JSON export & import'|t('formable'),
+] %}
+
+<div id="formable-editions" class="formable-editions">
+    <div class="formable-editions__header">
+        <div>
+            <h2>{{ 'Edition'|t('formable') }}</h2>
+            <p class="formable-editions__active">
+                {{ 'You are running'|t('formable') }}
+                <strong>{{ isPro ? 'Formable Pro'|t('formable') : 'Formable Lite'|t('formable') }}</strong>.
+                {% if isPro %}
+                    {{ 'Every Pro feature below is unlocked.'|t('formable') }}
+                {% else %}
+                    {{ 'Upgrade to Pro to unlock the features on the right.'|t('formable') }}
+                {% endif %}
+            </p>
+        </div>
+        <div class="formable-editions__cta">
+            {% if isPro %}
+                <a class="btn" href="{{ url('plugin-store/formable') }}">{{ 'Manage license'|t('formable') }}</a>
+            {% else %}
+                <a class="btn submit" href="{{ url('plugin-store/formable') }}">{{ 'Buy Formable Pro'|t('formable') }}</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="formable-editions__grid">
+        <div class="formable-editions__col{{ not isPro ? ' formable-editions__col--active' : '' }}">
+            <h3>{{ 'Lite'|t('formable') }}{% if not isPro %} <span class="formable-editions__you">{{ 'Your edition'|t('formable') }}</span>{% endif %}</h3>
+            <ul>
+                {% for feature in liteFeatures %}
+                    <li>{{ feature }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+        <div class="formable-editions__col{{ isPro ? ' formable-editions__col--active' : '' }}">
+            <h3>{{ 'Pro'|t('formable') }} {{ upgrade.badge() }}{% if isPro %} <span class="formable-editions__you">{{ 'Your edition'|t('formable') }}</span>{% endif %}</h3>
+            <p class="formable-editions__col-lead">{{ 'Everything in Lite, plus:'|t('formable') }}</p>
+            <ul>
+                {% for feature in proFeatures %}
+                    <li>{{ feature }}</li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+{% css %}
+    .formable-editions {
+        border: 1px solid var(--hairline-color, #e3e5e8);
+        border-radius: 6px;
+        padding: 18px 20px;
+        margin-bottom: 24px;
+        background: var(--gray-050, #f9fafc);
+    }
+    .formable-editions__header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        flex-wrap: wrap;
+    }
+    .formable-editions__header h2 {
+        margin: 0 0 4px;
+    }
+    .formable-editions__active {
+        margin: 0;
+        color: var(--medium-text-color, #606d7b);
+    }
+    .formable-editions__cta {
+        flex-shrink: 0;
+    }
+    .formable-editions__grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 16px;
+        margin-top: 18px;
+    }
+    @media (max-width: 640px) {
+        .formable-editions__grid {
+            grid-template-columns: 1fr;
+        }
+    }
+    .formable-editions__col {
+        border: 1px solid var(--hairline-color, #e3e5e8);
+        border-radius: 5px;
+        padding: 14px 16px;
+        background: var(--white, #fff);
+    }
+    .formable-editions__col--active {
+        border-color: var(--enabled-color, #27ae60);
+        box-shadow: 0 0 0 1px var(--enabled-color, #27ae60);
+    }
+    .formable-editions__col h3 {
+        margin: 0 0 8px;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+    .formable-editions__col-lead {
+        margin: 0 0 8px;
+        color: var(--medium-text-color, #606d7b);
+        font-size: 12px;
+    }
+    .formable-editions__you {
+        font-size: 11px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: .03em;
+        color: var(--enabled-color, #27ae60);
+    }
+    .formable-editions__col ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+    }
+    .formable-editions__col li {
+        position: relative;
+        padding: 3px 0 3px 22px;
+        font-size: 13px;
+    }
+    .formable-editions__col li::before {
+        content: '✓';
+        position: absolute;
+        left: 0;
+        top: 3px;
+        color: var(--enabled-color, #27ae60);
+        font-weight: 700;
+    }
+{% endcss %}
+
+<hr>
+
+{# Retention and IP capture are per-form settings, on the form's own Settings
+ # tab - there is no plugin-wide default for either, so nothing for them here. #}
+{{ forms.selectField({
+    label: 'Form Stylesheet'|t('formable'),
+    instructions: 'How much of Formable’s optional stylesheet rendered forms pull in. Loaded in full by default; choose Contract only to style the markup entirely from your own CSS while keeping the accessibility contract honoured.'|t('formable'),
+    id: 'themeLevel',
+    name: 'themeLevel',
+    value: settings.themeLevel,
+    options: [
+        { value: 'contract', label: 'Contract only - accessibility, no layout, no visual opinion'|t('formable') },
+        { value: 'reset', label: 'Reset only - layout and accessibility, no visual opinion'|t('formable') },
+        { value: 'default', label: 'Reset + theme - a complete baseline look'|t('formable') },
+    ],
+    errors: settings.getErrors('themeLevel'),
+    first: true,
+}) }}
+
+{{ forms.selectField({
+    label: 'Colour Scheme'|t('formable'),
+    instructions: 'The palette rendered forms paint with. Light by default, so a visitor’s dark OS preference never repaints a form’s text near-white on a light page; Follow visitor’s device restores that behaviour but paints the form’s own background so it stays legible either way. Needs the bundled stylesheet.'|t('formable'),
+    id: 'colorScheme',
+    name: 'colorScheme',
+    value: settings.colorScheme,
+    options: [
+        { value: 'light', label: 'Light'|t('formable') },
+        { value: 'dark', label: 'Dark'|t('formable') },
+        { value: 'auto', label: 'Follow visitor’s device'|t('formable') },
+    ],
+    errors: settings.getErrors('colorScheme'),
+}) }}
+
+{{ forms.colorField({
+    label: 'Brand Colour'|t('formable'),
+    instructions: 'The one colour every rendered form’s button, focus ring and progress bar derive from. Leave blank to keep the shipped neutral look.'|t('formable'),
+    id: 'palette-brand',
+    name: 'palette[brand]',
+    value: settings.palette.brand,
+    errors: settings.getErrors('palette.brand'),
+}) }}
+
+{{ forms.colorField({
+    label: 'Surface Colour'|t('formable'),
+    instructions: 'The form’s background. Leave blank to use the shipped surface for the chosen colour scheme.'|t('formable'),
+    id: 'palette-surface',
+    name: 'palette[surface]',
+    value: settings.palette.surface,
+    errors: settings.getErrors('palette.surface'),
+}) }}
+
+{{ forms.colorField({
+    label: 'Text Colour'|t('formable'),
+    instructions: 'Body and label text. Leave blank to use the shipped text colour for the chosen colour scheme.'|t('formable'),
+    id: 'palette-text',
+    name: 'palette[text]',
+    value: settings.palette.text,
+    errors: settings.getErrors('palette.text'),
+}) }}
+
+{{ forms.colorField({
+    label: 'Border Colour'|t('formable'),
+    instructions: 'Input and field borders. Leave blank to use the shipped border colour for the chosen colour scheme.'|t('formable'),
+    id: 'palette-border',
+    name: 'palette[border]',
+    value: settings.palette.border,
+    errors: settings.getErrors('palette.border'),
+}) }}
+
+<div id="formable-palette-contrast" class="instructions"></div>
+
+{{ forms.selectField({
+    label: 'Corner Radius'|t('formable'),
+    instructions: 'How rounded rendered form controls are.'|t('formable'),
+    id: 'palette-radius',
+    name: 'palette[radius]',
+    value: settings.palette.radius,
+    options: [
+        { value: 'sharp', label: 'Sharp'|t('formable') },
+        { value: 'soft', label: 'Soft'|t('formable') },
+        { value: 'round', label: 'Round'|t('formable') },
+    ],
+    errors: settings.getErrors('palette.radius'),
+}) }}
+
+{{ forms.selectField({
+    label: 'Button Style'|t('formable'),
+    instructions: 'How the submit button is painted.'|t('formable'),
+    id: 'palette-buttonStyle',
+    name: 'palette[buttonStyle]',
+    value: settings.palette.buttonStyle,
+    options: [
+        { value: 'filled', label: 'Filled'|t('formable') },
+        { value: 'outline', label: 'Outline'|t('formable') },
+        { value: 'soft', label: 'Soft'|t('formable') },
+    ],
+    errors: settings.getErrors('palette.buttonStyle'),
+}) }}
+
+{% js %}
+(function() {
+    var ids = {
+        brand: '{{ 'palette-brand'|namespaceInputId }}',
+        surface: '{{ 'palette-surface'|namespaceInputId }}',
+        text: '{{ 'palette-text'|namespaceInputId }}',
+        border: '{{ 'palette-border'|namespaceInputId }}'
+    };
+    var output = document.getElementById('{{ 'formable-palette-contrast'|namespaceInputId }}');
+    if (!output) {
+        return;
+    }
+
+    var pairs = [
+        { a: 'text', b: 'surface', threshold: 4.5, label: Craft.t('formable', 'Text on surface') },
+        { a: 'border', b: 'surface', threshold: 3, label: Craft.t('formable', 'Border on surface') },
+        { a: 'brand', b: 'surface', threshold: 3, label: Craft.t('formable', 'Brand on surface') }
+    ];
+
+    function isHex(value) {
+        return /^[0-9a-f]{6}$/i.test((value || '').replace('#', ''));
+    }
+
+    function relativeLuminance(hex) {
+        hex = hex.replace('#', '');
+        var channels = [
+            parseInt(hex.substr(0, 2), 16) / 255,
+            parseInt(hex.substr(2, 2), 16) / 255,
+            parseInt(hex.substr(4, 2), 16) / 255
+        ].map(function(normalized) {
+            return normalized <= 0.03928 ? normalized / 12.92 : Math.pow((normalized + 0.055) / 1.055, 2.4);
+        });
+
+        return 0.2126 * channels[0] + 0.7152 * channels[1] + 0.0722 * channels[2];
+    }
+
+    function contrastRatio(hexA, hexB) {
+        var a = relativeLuminance(hexA);
+        var b = relativeLuminance(hexB);
+
+        return (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+    }
+
+    function render() {
+        var values = {};
+
+        Object.keys(ids).forEach(function(key) {
+            var el = document.getElementById(ids[key]);
+            values[key] = el ? el.value : '';
+        });
+
+        output.innerHTML = pairs
+            .filter(function(pair) {
+                return isHex(values[pair.a]) && isHex(values[pair.b]);
+            })
+            .map(function(pair) {
+                var ratio = contrastRatio(values[pair.a], values[pair.b]);
+                var passes = ratio >= pair.threshold;
+
+                return '<p style="color:' + (passes ? 'var(--enabled-color, #27ae60)' : 'var(--error-color, #cf1124)') + ';margin:2px 0;">'
+                    + Craft.escapeHtml(pair.label) + ': ' + ratio.toFixed(2) + ':1'
+                    + ' (' + pair.threshold.toFixed(1) + ':1 needed) '
+                    + (passes ? '✓' : '✗')
+                    + '</p>';
+            })
+            .join('');
+    }
+
+    Object.keys(ids).forEach(function(key) {
+        var el = document.getElementById(ids[key]);
+        if (el) {
+            el.addEventListener('input', render);
+        }
+    });
+
+    render();
+})();
+{% endjs %}
+
+<hr>
+
+<h2>{{ 'Data protection'|t('formable') }}</h2>
+<p>{{ 'How long Formable keeps personal data that sits alongside submissions. How long submissions themselves are kept is set per form, under Privacy & data in the form’s settings.'|t('formable') }}</p>
+
+{{ forms.lightswitchField({
+    label: 'Delete Uploads With Submissions'|t('formable'),
+    instructions: 'When a submission is permanently deleted - by hand, by its form’s retention period, or when it is emptied from the trash - delete the files that were uploaded with it too. Only files Formable uploaded for that submission are ever deleted.'|t('formable'),
+    id: 'deleteUploadsWithSubmissions',
+    name: 'deleteUploadsWithSubmissions',
+    on: settings.deleteUploadsWithSubmissions,
+    errors: settings.getErrors('deleteUploadsWithSubmissions'),
+}) }}
+
+{{ forms.textField({
+    label: 'Delivery Log Retention (days)'|t('formable'),
+    instructions: 'How long to keep the notification and integration logs. Older entries are removed during garbage collection. Set to 0 to keep them indefinitely.'|t('formable'),
+    id: 'deliveryLogRetentionDays',
+    name: 'deliveryLogRetentionDays',
+    type: 'number',
+    size: 5,
+    value: settings.deliveryLogRetentionDays,
+    errors: settings.getErrors('deliveryLogRetentionDays'),
+}) }}
+
+<hr>
+
+<h2>{{ 'Integrations'|t('formable') }}</h2>
+
+{{ forms.textareaField({
+    label: 'Integration Allowed Hosts'|t('formable'),
+    instructions: 'Integrations refuse to call private, loopback and link-local addresses, so a webhook can’t be aimed at your internal network. List any that should be allowed anyway, one per line: a hostname, an IP address or a CIDR range, e.g. {example}.'|t('formable', { example: '`hooks.internal.example`, `10.0.4.0/24`' }),
+    id: 'integrationAllowedHosts',
+    name: 'integrationAllowedHosts',
+    rows: 3,
+    value: settings.integrationAllowedHosts,
+    errors: settings.getErrors('integrationAllowedHosts'),
+}) }}
+
+<hr>
+
+<h2>{{ 'Weekly digest'|t('formable') }} {{ upgrade.badge() }}</h2>
+<p>{{ 'Email a summary of each form’s new submissions and spam counts for the past 7 days. Point your server’s cron at {command} - running it hourly is fine - to send on schedule.'|t('formable', { command: '`craft formable/digest/run`' }) }}</p>
+
+{% if not isPro %}
+{{ upgrade.prompt('The weekly digest'|t('formable')) }}
+{% else %}
+{{ forms.lightswitchField({
+    label: 'Send Weekly Digest'|t('formable'),
+    id: 'weeklyDigestEnabled',
+    name: 'weeklyDigestEnabled',
+    on: settings.weeklyDigestEnabled,
+    errors: settings.getErrors('weeklyDigestEnabled'),
+}) }}
+
+{{ forms.textareaField({
+    label: 'Recipients'|t('formable'),
+    instructions: 'Who the digest goes to. One address per line, or comma-separated.'|t('formable'),
+    id: 'weeklyDigestRecipients',
+    name: 'weeklyDigestRecipients',
+    rows: 3,
+    value: settings.weeklyDigestRecipients,
+    errors: settings.getErrors('weeklyDigestRecipients'),
+}) }}
+
+{{ forms.selectField({
+    label: 'Day'|t('formable'),
+    id: 'weeklyDigestDay',
+    name: 'weeklyDigestDay',
+    value: settings.weeklyDigestDay,
+    options: [
+        { value: 1, label: 'Monday'|t('formable') },
+        { value: 2, label: 'Tuesday'|t('formable') },
+        { value: 3, label: 'Wednesday'|t('formable') },
+        { value: 4, label: 'Thursday'|t('formable') },
+        { value: 5, label: 'Friday'|t('formable') },
+        { value: 6, label: 'Saturday'|t('formable') },
+        { value: 7, label: 'Sunday'|t('formable') },
+    ],
+    errors: settings.getErrors('weeklyDigestDay'),
+}) }}
+
+{% set hourOptions = [] %}
+{% for h in 0..23 %}
+    {% set hourOptions = hourOptions|merge([{ value: h, label: '%02d:00'|format(h) }]) %}
+{% endfor %}
+{{ forms.selectField({
+    label: 'Hour'|t('formable'),
+    instructions: 'The hour to send, in your site’s timezone.'|t('formable'),
+    id: 'weeklyDigestHour',
+    name: 'weeklyDigestHour',
+    value: settings.weeklyDigestHour,
+    options: hourOptions,
+    errors: settings.getErrors('weeklyDigestHour'),
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Skip Empty Weeks'|t('formable'),
+    instructions: 'Don’t send a digest for a week with no new submissions or spam.'|t('formable'),
+    id: 'weeklyDigestSkipWhenEmpty',
+    name: 'weeklyDigestSkipWhenEmpty',
+    on: settings.weeklyDigestSkipWhenEmpty,
+    errors: settings.getErrors('weeklyDigestSkipWhenEmpty'),
+}) }}
+
+{{ forms.textField({
+    label: 'Digest Sender Email'|t('formable'),
+    instructions: 'The From address the digest is sent from. Leave blank to use the system email address. This applies to the digest only - notification emails use Craft’s own email settings.'|t('formable'),
+    id: 'senderEmail',
+    name: 'senderEmail',
+    value: settings.senderEmail,
+    errors: settings.getErrors('senderEmail'),
+}) }}
+
+{{ forms.textField({
+    label: 'Digest Sender Name'|t('formable'),
+    instructions: 'The From name the digest is sent under.'|t('formable'),
+    id: 'senderName',
+    name: 'senderName',
+    value: settings.senderName,
+    errors: settings.getErrors('senderName'),
+}) }}
+
+<div class="field">
+    <div class="heading">
+        <label>{{ 'Send a test'|t('formable') }}</label>
+        <div class="instructions"><p>{{ 'Send this week’s digest to one address now. Leave blank to use the recipients above.'|t('formable') }}</p></div>
+    </div>
+    <div class="input">
+        <input type="text" class="text" id="formable-digest-test-to" placeholder="you@example.com" style="max-width:260px;display:inline-block;">
+        <button type="button" class="btn" id="formable-digest-test-btn">{{ 'Send test digest'|t('formable') }}</button>
+        <span class="spinner hidden" id="formable-digest-test-spinner"></span>
+    </div>
+</div>
+{% endif %}
+
+{% js %}
+(function() {
+    var btn = document.getElementById('formable-digest-test-btn');
+    if (!btn) return;
+    var spinner = document.getElementById('formable-digest-test-spinner');
+    btn.addEventListener('click', function() {
+        var to = document.getElementById('formable-digest-test-to').value;
+        btn.classList.add('disabled');
+        btn.setAttribute('disabled', 'disabled');
+        spinner.classList.remove('hidden');
+        Craft.sendActionRequest('POST', 'formable/digest/test', { data: { to: to } })
+            .then(function(response) {
+                var data = response.data || {};
+                if (data.success) {
+                    Craft.cp.displayNotice(Craft.escapeHtml(data.message));
+                } else {
+                    Craft.cp.displayError(Craft.escapeHtml(data.message));
+                }
+            })
+            .catch(function(e) {
+                var msg = (e.response && e.response.data && e.response.data.message)
+                    ? e.response.data.message
+                    : Craft.t('formable', 'The test digest could not be sent.');
+                Craft.cp.displayError(Craft.escapeHtml(msg));
+            })
+            .finally(function() {
+                btn.classList.remove('disabled');
+                btn.removeAttribute('disabled');
+                spinner.classList.add('hidden');
+            });
+    });
+})();
+{% endjs %}
+
+<hr>
+
+<h2>{{ 'Spam protection'|t('formable') }}</h2>
+<p>{{ 'These apply to every form. Turn the individual checks on per form under a form’s Spam protection settings.'|t('formable') }}</p>
+
+{{ forms.textField({
+    label: 'Honeypot Field Name'|t('formable'),
+    instructions: 'The name of the decoy field added to forms with the honeypot enabled. Change it if spammers learn the default.'|t('formable'),
+    id: 'honeypotFieldName',
+    name: 'honeypotFieldName',
+    class: 'code',
+    value: settings.honeypotFieldName,
+    errors: settings.getErrors('honeypotFieldName'),
+}) }}
+
+{{ forms.textareaField({
+    label: 'Blocked Keywords'|t('formable'),
+    instructions: 'One per line. A submission whose text contains any of these - matched anywhere, ignoring case - is treated as spam.'|t('formable'),
+    id: 'spamKeywords',
+    name: 'spamKeywords',
+    rows: 4,
+    value: settings.spamKeywords,
+    errors: settings.getErrors('spamKeywords'),
+}) }}
+
+{{ forms.textareaField({
+    label: 'Blocked IP Addresses'|t('formable'),
+    instructions: 'One per line. Use {star} as a wildcard, e.g. {example}.'|t('formable', { star: '`*`', example: '`203.0.113.*`' }),
+    id: 'blockedIps',
+    name: 'blockedIps',
+    rows: 4,
+    value: settings.blockedIps,
+    errors: settings.getErrors('blockedIps'),
+}) }}
+
+{{ forms.textField({
+    label: 'Save for Later Limit'|t('formable'),
+    instructions: 'How many times one IP address may save an unfinished form for later, per form, within the window below. Further attempts are ignored. Set to 0 to turn this off.'|t('formable'),
+    id: 'rateLimitMax',
+    name: 'rateLimitMax',
+    type: 'number',
+    size: 5,
+    value: settings.rateLimitMax,
+    errors: settings.getErrors('rateLimitMax'),
+}) }}
+
+{{ forms.textField({
+    label: 'Save for Later Limit Window'|t('formable'),
+    instructions: 'The window, in seconds, the limit above is counted over.'|t('formable'),
+    id: 'rateLimitWindow',
+    name: 'rateLimitWindow',
+    type: 'number',
+    size: 6,
+    value: settings.rateLimitWindow,
+    errors: settings.getErrors('rateLimitWindow'),
+}) }}
+
+{{ forms.textField({
+    label: 'Submission Limit'|t('formable'),
+    instructions: 'How many times one IP address may submit a form, per form, within the window below. Further attempts are silently accepted but neither stored nor sent. Since visitors behind the same router or proxy share one address, set this high enough for a busy shared connection - a kiosk, an office - to not be mistaken for a bot. Set to 0 to turn this off.'|t('formable'),
+    id: 'submitRateLimitMax',
+    name: 'submitRateLimitMax',
+    type: 'number',
+    size: 5,
+    value: settings.submitRateLimitMax,
+    errors: settings.getErrors('submitRateLimitMax'),
+}) }}
+
+{{ forms.textField({
+    label: 'Submission Limit Window'|t('formable'),
+    instructions: 'The window, in seconds, the limit above is counted over.'|t('formable'),
+    id: 'submitRateLimitWindow',
+    name: 'submitRateLimitWindow',
+    type: 'number',
+    size: 6,
+    value: settings.submitRateLimitWindow,
+    errors: settings.getErrors('submitRateLimitWindow'),
+}) }}
+
+<hr>
+
+<h2>{{ 'Captchas'|t('formable') }} {{ upgrade.badge() }}</h2>
+<p>{{ 'Enter the keys for whichever providers you use, then pick a captcha per form. A provider with no keys is simply skipped.'|t('formable') }}</p>
+
+{% if not isPro %}
+{{ upgrade.prompt('Captchas'|t('formable')) }}
+{% else %}
+{{ forms.autosuggestField({
+    label: 'reCAPTCHA v2 Site Key'|t('formable'),
+    id: 'recaptchaV2SiteKey',
+    name: 'recaptchaV2SiteKey',
+    suggestEnvVars: true,
+    value: settings.recaptchaV2SiteKey,
+    errors: settings.getErrors('recaptchaV2SiteKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'reCAPTCHA v2 Secret Key'|t('formable'),
+    id: 'recaptchaV2SecretKey',
+    name: 'recaptchaV2SecretKey',
+    suggestEnvVars: true,
+    value: settings.recaptchaV2SecretKey,
+    errors: settings.getErrors('recaptchaV2SecretKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'reCAPTCHA v3 Site Key'|t('formable'),
+    id: 'recaptchaV3SiteKey',
+    name: 'recaptchaV3SiteKey',
+    suggestEnvVars: true,
+    value: settings.recaptchaV3SiteKey,
+    errors: settings.getErrors('recaptchaV3SiteKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'reCAPTCHA v3 Secret Key'|t('formable'),
+    id: 'recaptchaV3SecretKey',
+    name: 'recaptchaV3SecretKey',
+    suggestEnvVars: true,
+    value: settings.recaptchaV3SecretKey,
+    errors: settings.getErrors('recaptchaV3SecretKey'),
+}) }}
+
+{{ forms.textField({
+    label: 'reCAPTCHA v3 Threshold'|t('formable'),
+    instructions: 'Scores below this are treated as spam (0–1). Google’s default is 0.5.'|t('formable'),
+    id: 'recaptchaV3Threshold',
+    name: 'recaptchaV3Threshold',
+    type: 'number',
+    step: '0.1',
+    min: 0,
+    max: 1,
+    size: 6,
+    value: settings.recaptchaV3Threshold,
+    errors: settings.getErrors('recaptchaV3Threshold'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'hCaptcha Site Key'|t('formable'),
+    id: 'hcaptchaSiteKey',
+    name: 'hcaptchaSiteKey',
+    suggestEnvVars: true,
+    value: settings.hcaptchaSiteKey,
+    errors: settings.getErrors('hcaptchaSiteKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'hCaptcha Secret Key'|t('formable'),
+    id: 'hcaptchaSecretKey',
+    name: 'hcaptchaSecretKey',
+    suggestEnvVars: true,
+    value: settings.hcaptchaSecretKey,
+    errors: settings.getErrors('hcaptchaSecretKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Turnstile Site Key'|t('formable'),
+    id: 'turnstileSiteKey',
+    name: 'turnstileSiteKey',
+    suggestEnvVars: true,
+    value: settings.turnstileSiteKey,
+    errors: settings.getErrors('turnstileSiteKey'),
+}) }}
+
+{{ forms.autosuggestField({
+    label: 'Turnstile Secret Key'|t('formable'),
+    id: 'turnstileSecretKey',
+    name: 'turnstileSecretKey',
+    suggestEnvVars: true,
+    value: settings.turnstileSecretKey,
+    errors: settings.getErrors('turnstileSecretKey'),
+}) }}
+{% endif %}

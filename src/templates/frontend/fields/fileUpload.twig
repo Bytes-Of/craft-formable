@@ -1,0 +1,38 @@
+{% set extensions = field.allowedExtensions %}
+{% set maxBytes = field.maxFileSizeInBytes %}
+{# The wrapper is a drop target and a per-file list once the front-end bundle
+ # enhances it (`file-upload.ts`); without JavaScript it is a bare block around
+ # the native input and changes nothing. The size cap, the file limit and the
+ # translated messages ride along as data attributes because the bundle owns
+ # the checks the server can't run before the upload - `__NAME__` is a
+ # filename placeholder the bundle substitutes, the same pattern the Table
+ # field uses for its row labels. #}
+<div class="formable-file"
+    data-formable-file-upload
+    data-limit="{{ field.limit }}"
+    data-remove-label="{{ 'Remove {filename}'|t('formable', { filename: '__NAME__' }) }}"
+    data-uploading-label="{{ 'Uploading {filename}'|t('formable', { filename: '__NAME__' }) }}"
+    data-selected-label="{{ '{count} file(s) selected'|t('formable', { count: '__COUNT__' }) }}"
+    data-added-label="{{ '{count} file(s) added'|t('formable', { count: '__COUNT__' }) }}"
+    data-removed-label="{{ 'Removed {filename}'|t('formable', { filename: '__NAME__' }) }}"
+    data-prompt="{{ 'Drag files here, or click to browse'|t('formable') }}"
+    data-prompt-touch="{{ 'Tap to choose files'|t('formable') }}"
+    {%- if maxBytes %} data-max-bytes="{{ maxBytes }}"{% endif %}
+    {%- if field.maxFileSize %} data-size-error="{{ '“{filename}” is larger than the {size} MB limit.'|t('formable', { filename: '__NAME__', size: field.maxFileSize }) }}"{% endif %}
+    {%- if field.limit > 1 %} data-count-error="{{ 'Only the first {limit} files were kept.'|t('formable', { limit: field.limit }) }}"{% endif %}>
+    <input type="file"
+        id="{{ inputId }}"
+        name="{{ inputName }}{{ field.limit > 1 ? '[]' : '' }}"
+        class="formable-input formable-input--file"
+        {%- if field.limit > 1 %} multiple{% endif %}
+        {%- if extensions %} accept="{{ extensions|map(e => ".#{e}")|join(',') }}"{% endif %}
+        {%- if field.required %} required{% endif %}
+        {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+</div>
+{% if field.limit > 1 or field.maxFileSize %}
+<p class="formable-field__hint" id="{{ inputId }}-hint">
+    {%- if field.limit > 1 %}{{ 'Up to {limit} files.'|t('formable', { limit: field.limit }) }} {% endif %}
+    {%- if field.maxFileSize %}{{ 'Max {size} MB each.'|t('formable', { size: field.maxFileSize }) }}{% endif %}
+</p>
+{% endif %}

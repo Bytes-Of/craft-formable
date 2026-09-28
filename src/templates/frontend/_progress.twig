@@ -1,0 +1,102 @@
+{#
+ # The multi-page progress indicator.
+ #
+ # Reported over the *visible* pages, so a form that conditionally skips a page
+ # reads "2 of 3" rather than jumping a number. This whole partial is torn down
+ # and rebuilt on every AJAX step change, so the label below is plain text, not
+ # a live region - one added fresh to the page announces nothing. The actual
+ # announcement happens through the persistent live region in `form.twig`,
+ # which `main.ts`'s `swapStep()` updates with this label's text after the swap.
+ #
+ # Variables:
+ #   form       the Form these settings belong to
+ #   settings   FormSettings (progressIndicator, reviewPageLabel), already
+ #              localized to the current site
+ #              ({@see \bytesof\formable\services\Translations::localizeSettings()})
+ #   progress   { step, total }
+ #   isReview   whether the current step is the review
+ #   pages      every page of the form, indexed as `sequence` indexes them
+ #   sequence   indexes of the pages the submitter will actually see
+ #}
+{% set reviewPageLabel = settings.reviewPageLabel %}
+{% set step = isReview ? progress.total + 1 : progress.step %}
+{% set total = settings.showReviewPage ? progress.total + 1 : progress.total %}
+{% set percent = total > 0 ? (step / total * 100)|round : 0 %}
+
+{# The stepped indicator names each step after the page it stands for, so the
+   labels are gathered in sequence order: a page conditioned out of this pass is
+   not a step and never claims a number. A page with no label of its own falls
+   back to its number alone, which is all this partial rendered before.
+
+   Guarded rather than assumed, because a site that copied `_step.twig` into its
+   own template directory before these two variables existed still includes
+   this file - and gets the numbers, silently, instead of an error. #}
+{% set stepLabels = pages is defined and sequence is defined
+    ? sequence|map(index => pages[index].label ?? null)
+    : [] %}
+{% set stepLabels = settings.showReviewPage
+    ? stepLabels|merge([reviewPageLabel])
+    : stepLabels %}
+
+{# The current page's own name, folded into the label below - it's what a
+   narrow container or a long stepper falls back to once the full step list is
+   hidden (`formable-reset.css`'s `.formable-progress--compact` / narrow-
+   container rule, [[frontend-embeddability-review]] chunk 9, L3), and a richer
+   announcement than "Step 2 of 6" alone even where the list stays visible. #}
+{% set currentPageLabel = stepLabels[step - 1] ?? null %}
+{% set stepOfTotal = "Step #{step} of #{total}"|t('formable') %}
+{% set label = isReview
+    ? reviewPageLabel
+    : (settings.progressIndicator == 'steps' and currentPageLabel
+        ? "#{stepOfTotal} · #{currentPageLabel}"
+        : stepOfTotal) %}
+
+{# 8 is arbitrary but matches the finding's own wording ("squeezes labels with
+   8+ steps") - past it, the full step list collapses to the label above
+   regardless of how much room the container has. #}
+{% set manySteps = total >= 8 %}
+{% set compact = settings.progressIndicator == 'steps' and manySteps %}
+
+<div class="formable-progress formable-progress--{{ settings.progressIndicator }}{{ compact ? ' formable-progress--compact' : '' }}"
+    data-formable-progress
+    role="group"
+    aria-label="{{ 'Form progress'|t('formable') }}">
+
+    <p class="formable-progress__label" data-formable-progress-label>
+        {{ label }}
+    </p>
+
+    {% if settings.progressIndicator == 'bar' %}
+        {# `aria-label` rather than `aria-labelledby` to the visible label: the
+           partial has no form-scoped id to hand out, and two forms on one page
+           must not both mint `id="formable-progress-label"`. #}
+        <div class="formable-progress__track"
+            role="progressbar"
+            aria-label="{{ label }}"
+            aria-valuenow="{{ step }}"
+            aria-valuemin="1"
+            aria-valuemax="{{ total }}">
+            {# `width` arrives via `renderStyleVars()` in `main.ts`, not an inline
+               `style` - a strict CSP blocks that attribute, and without it the
+               fill fell back to the track's own full width, so every step read
+               100% instead of failing quietly. `data-percent` is the value the
+               enhancer reads; the CSS default below is what a no-JS visitor
+               sees, with the textual label above carrying the real progress
+               either way. #}
+            <div class="formable-progress__fill" data-formable-progress-fill
+                data-percent="{{ percent }}"></div>
+        </div>
+    {% elseif settings.progressIndicator == 'steps' %}
+        <ol class="formable-progress__steps">
+            {% for i in 1..total %}
+                {% set state = i < step ? 'done' : (i == step ? 'current' : 'upcoming') %}
+                {% set stepLabel = stepLabels[i - 1] ?? null %}
+                <li class="formable-progress__step formable-progress__step--{{ state }}"
+                    {%- if i == step %} aria-current="step"{% endif %}>
+                    <span class="formable-progress__step-number">{{ i }}</span>
+                    {% if stepLabel %}<span class="formable-progress__step-label">{{ stepLabel }}</span>{% endif %}
+                </li>
+            {% endfor %}
+        </ol>
+    {% endif %}
+</div>

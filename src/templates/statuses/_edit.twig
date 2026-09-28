@@ -1,0 +1,64 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+    { label: 'Submission statuses'|t('formable'), url: cpUrl('formable/statuses') },
+] %}
+
+{% set fullPageForm = true %}
+
+{% block content %}
+    <input type="hidden" name="action" value="formable/statuses/save">
+    {{ redirectInput('formable/statuses') }}
+    {% if not isNew %}{{ hiddenInput('statusId', status.id) }}{% endif %}
+
+    {{ forms.textField({
+        first: true,
+        label: 'Name'|t('formable'),
+        instructions: 'What this status is called in the control panel.'|t('formable'),
+        id: 'name',
+        name: 'name',
+        value: status.name,
+        errors: status.getErrors('name'),
+        required: true,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Handle'|t('formable'),
+        instructions: 'How templates and GraphQL refer to this status.'|t('formable'),
+        id: 'handle',
+        name: 'handle',
+        class: 'code',
+        value: status.handle,
+        errors: status.getErrors('handle'),
+        required: true,
+    }) }}
+
+    {{ forms.colorSelectField({
+        label: 'Color'|t('formable'),
+        instructions: 'The indicator shown beside submissions in this status.'|t('formable'),
+        id: 'color',
+        name: 'color',
+        value: status.color,
+        errors: status.getErrors('color'),
+        withBlankOption: false,
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'Default'|t('formable'),
+        instructions: isDefault
+            ? 'Submissions start in this status. To change that, make another status the default.'|t('formable')
+            : 'Give incoming submissions this status, unless the form names another one on its Settings tab.'|t('formable'),
+        id: 'isDefault',
+        name: 'isDefault',
+        on: isDefault or status.isDefault,
+        disabled: isDefault,
+    }) }}
+{% endblock %}
+
+{% if isNew %}
+    {% js %}
+        new Craft.HandleGenerator("#{{ 'name'|namespaceInputId }}", "#{{ 'handle'|namespaceInputId }}");
+    {% endjs %}
+{% endif %}

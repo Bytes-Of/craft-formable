@@ -1,0 +1,97 @@
+{#
+ # One step of a form: the progress indicator, then either the current page or
+ # the review, then the navigation.
+ #
+ # This is the unit that changes as the submitter moves through a multi-page
+ # form - a non-JS page reload re-renders it, and an AJAX `next`/`back` swaps it
+ # in from the JSON response. Everything stable (the form element, the CSRF and
+ # action inputs) lives in the shell outside it.
+ #
+ # Variables:
+ #   form, pages, submission, settings, values, errors
+ #   currentPage, isReview, sequence, progress, isLastPage, isMultiPage, spam, templatePath
+ #   formId    this render's unique form id (see `form.twig`) - passed down when
+ #             included from the shell; when this partial is the AJAX swap's
+ #             own root render, `options` and `flowId` build it the same way
+ #             `form.twig` does, so a page/field id minted here never collides
+ #             with the same form's other embed on the page.
+ #   headingLevel  heading level the page/review headings start from (see `form.twig`);
+ #                 defaults to 2 the same way, for the AJAX swap's own root render.
+ #}
+{% set isFinalStep = isReview or (isLastPage and not settings.showReviewPage) %}
+{% set formId = formId ?? (options.id ?? "formable-form-#{form.handle}-#{flowId}") %}
+{% set headingLevel = headingLevel ?? 2 %}
+{% if isMultiPage and settings.progressIndicator != 'none' %}
+    {{ include(craft.formable.template('_progress', templatePath), {
+        form: form,
+        settings: settings,
+        progress: progress,
+        isReview: isReview,
+        pages: pages,
+        sequence: sequence,
+    }, with_context = false) }}
+{% endif %}
+
+{# Carries the current page to the next post. Trusted only as a hint - the
+   server clamps it and always looks the fields up from the form itself. #}
+<input type="hidden" name="pageIndex" value="{{ currentPage }}" data-formable-page-index>
+{% if isReview %}<input type="hidden" name="formableReview" value="1">{% endif %}
+
+{# Seeds `conditions-dom.ts` with every value the submitter has already given,
+   not just the fields on the page now in the DOM - without it, a condition
+   naming an earlier page's field always evaluates against `undefined` on the
+   page that reads it. This is the same map `Conditions::resolve()` validates
+   against server-side, so the two engines start from the same state by
+   construction instead of the client trying to reconstruct it. Only needed
+   past the first page, and re-emitted on every AJAX swap so it never goes
+   stale as the submitter moves forward. See
+   internal/decisions/0096-conditions-dom-reads-a-seeded-value-map-not-only-the-current-page.md. #}
+{% if isMultiPage %}
+    <input type="hidden" data-formable-values="{{ values|json_encode|e('html_attr') }}">
+{% endif %}
+
+{% if isReview %}
+    {{ include(craft.formable.template('_review', templatePath), {
+        form: form,
+        pages: pages,
+        submission: submission,
+        settings: settings,
+        values: values,
+        templatePath: templatePath,
+        headingLevel: headingLevel,
+    }, with_context = false) }}
+{% else %}
+    {% set page = pages[currentPage] ?? pages|first %}
+    {{ include(craft.formable.template('_page', templatePath), {
+        form: form,
+        page: page,
+        pageCount: pages|length,
+        pageIndex: currentPage,
+        isFirstPage: sequence|first == currentPage,
+        isLastPage: isLastPage,
+        values: values,
+        errors: errors,
+        templatePath: templatePath,
+        formId: formId,
+        headingLevel: headingLevel,
+    }, with_context = false) }}
+{% endif %}
+
+{# The captcha challenge belongs to the real submit, so it renders on the final
+   step only - the last page, or the review step when there is one. #}
+{% if isFinalStep and spam is defined and spam and spam.captcha %}
+    {{ include(craft.formable.template('_captcha', templatePath), {
+        captcha: spam.captcha,
+    }, with_context = false) }}
+{% endif %}
+
+{{ include(craft.formable.template('_nav', templatePath), {
+    form: form,
+    settings: settings,
+    isMultiPage: isMultiPage,
+    isReview: isReview,
+    isFirstStep: not isReview and sequence|first == currentPage,
+    isLastPage: isLastPage,
+    showReview: settings.showReviewPage,
+    formId: formId,
+}, with_context = false) }}

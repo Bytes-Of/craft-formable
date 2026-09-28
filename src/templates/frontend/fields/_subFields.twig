@@ -1,0 +1,23 @@
+{# Shared body for composite fields. Each sub-input gets its own visible
+ # label; the fieldset legend from the wrapper supplies the group name. #}
+<div class="formable-subfields">
+    {% for handle, subField in field.subFields %}
+        {% set subId = "#{inputId}-#{handle}" %}
+        {% set isRequired = field.required or subField.required %}
+        <div class="formable-subfield formable-subfield--{{ handle }}">
+            <label class="formable-subfield__label" for="{{ subId }}">
+                {{ subField.label }}
+                {%- if isRequired %} <span class="formable-field__required" aria-hidden="true">*</span>{% endif %}
+            </label>
+            <input type="text"
+                id="{{ subId }}"
+                name="{{ inputName }}[{{ handle }}]"
+                class="formable-input formable-input--text"
+                value="{{ (value ?? {})[handle] ?? '' }}"
+                dir="auto"
+                {%- if subField.autocomplete %} autocomplete="{{ subField.autocomplete }}"{% endif %}
+                {%- if isRequired %} required{% endif %}
+                {%- if hasErrors %} aria-invalid="true"{% endif %}>
+        </div>
+    {% endfor %}
+</div>

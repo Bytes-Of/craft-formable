@@ -1,0 +1,137 @@
+{#
+ # The form shell.
+ #
+ # Posts to the current page (not to /actions/…) with an `action` input, so a
+ # failed non-JS submit re-renders this same page with the submitter's values
+ # and errors attached. A multi-page form is rendered one step at a time: the
+ # shell is stable, and the `_step` partial inside it (progress, the current
+ # page or the review, and the navigation) is what a page reload or an AJAX
+ # `next` replaces.
+ #
+ # The surface from the success notice through the error summary is
+ # `_shellOpen.twig`; the captcha/nav/`</form>` below the step is
+ # `_shellClose.twig` (both off here - `_step.twig` renders its own for the
+ # current page). `renderFormShell()` includes the same two partials around an
+ # author's own field markup instead of this file's step machinery. See
+ # internal/decisions/0093.
+ #
+ # Variables:
+ #   form            Form element
+ #   pages           pages whose rows hold instantiated FormField objects
+ #   submission      Submission the form renders against (blank, or the rejected one)
+ #   settings        FormSettings, already localized to the current site
+ #                   ({@see \bytesof\formable\services\Translations::localizeSettings()})
+ #   errorMessage    settings.errorMessage, rendered (it may carry author Twig) -
+ #                   see {@see \bytesof\formable\services\Rendering::renderMessage()}
+ #   errors          field errors keyed by handle
+ #   values          field values keyed by handle
+ #   successMessage  flashed message from a completed non-JS submit, or null
+ #   hasFileUploads  whether any field uploads files (drives the enctype)
+ #   currentPage     index of the page this render opens on
+ #   isReview        whether this render is the review step
+ #   flowId          identifies this pass through the form (per-tab progress slot)
+ #   sequence        indexes of the pages the submitter will actually see
+ #   progress        { step, total } over the visible pages
+ #   isLastPage      whether currentPage is the last in the sequence
+ #   templatePath    the form's template override directory, or null
+ #   colorScheme     resolved light | dark | auto, emitted as data-formable-scheme
+ #   palette         resolved Palette - radius/buttonStyle always carry a concrete value
+ #   paletteHash     key for the registered palette CSS block, or null when nothing is set
+ #   paletteVarsJson the palette's CSS declarations as JSON, or null - read by style-vars.ts's CSP repair pass
+ #   headingLevel    heading level the page/review/success headings start from (default 2)
+ #}
+{% set hasErrors = errors|length > 0 or submission.hasErrors() %}
+{# `flowId` is unique to this pass through the form even when `options.id` isn't
+   given, so two renders of the same form on one page - two calls to
+   `renderForm()`, each minting its own flow - never share a `formId` and never
+   collide on the ids and `for`/`aria-describedby`/anchor links derived from it
+   below. An author who does pass `options.id` is opting into a stable id
+   instead, and is responsible for keeping it unique if they embed the form
+   more than once. #}
+{% set formId = options.id ?? "formable-form-#{form.handle}-#{flowId}" %}
+{% set headingLevel = headingLevel ?? 2 %}
+{% set isMultiPage = pages|length > 1 %}
+
+{# Every field on the page(s) this render can actually show, keyed by handle -
+   what the error summary below looks fields up in to build its anchor list.
+   Not built from `errors` itself, which is only handle => messages: the field
+   is what names the anchor (`formable-{id}`, matching `_field.twig`'s
+   `inputId`) and the link text. Skipped for the review step - it has no
+   inputs to jump to, and `PageFlow` never leaves a submitter there with field
+   errors anyway, it sends them back to the offending page instead. #}
+{% set fieldsByHandle = {} %}
+{% if hasErrors and not isReview %}
+    {% set currentPageRows = (pages[currentPage] ?? pages|first).rows ?? [] %}
+    {% for row in currentPageRows %}
+        {% for field in row.fields %}
+            {% set fieldsByHandle = fieldsByHandle|merge({ (field.handle): field }) %}
+        {% endfor %}
+    {% endfor %}
+{% endif %}
+
+{{ include(craft.formable.template('_shellOpen', templatePath), {
+    form: form,
+    options: options,
+    flowId: flowId,
+    formId: formId,
+    headingLevel: headingLevel,
+    settings: settings,
+    errorMessage: errorMessage,
+    errors: errors,
+    hasErrors: hasErrors,
+    fieldsByHandle: fieldsByHandle,
+    fieldIdPrefix: "#{formId}-field-",
+    successMessage: successMessage,
+    successDetails: successDetails,
+    colorScheme: colorScheme,
+    palette: palette,
+    paletteHash: paletteHash,
+    paletteVarsJson: paletteVarsJson,
+    hasFileUploads: hasFileUploads,
+    isShell: false,
+    spam: spam ?? null,
+    templatePath: templatePath,
+}, with_context = false) }}
+
+{% if isMultiPage and settings.progressIndicator != 'none' %}
+    {# The one piece of the progress indicator that can actually announce a
+       step change on the AJAX path. `_progress.twig`'s visible label lives
+       inside the swappable step below and is torn down and rebuilt on
+       every navigation - a live region announces nothing about content
+       that's new to the page, only about content that changes after it's
+       already there. This region sits outside the step, so it's on the
+       page before the first navigation, and `swapStep()` in `main.ts`
+       writes the new label into it after every swap. #}
+    <p class="formable-visually-hidden" aria-live="polite" data-formable-progress-announcer></p>
+{% endif %}
+
+{# The step container is the unit AJAX navigation swaps out - everything
+   that changes from page to page lives inside it. #}
+<div data-formable-step>
+    {{ include(craft.formable.template('_step', templatePath), {
+        form: form,
+        pages: pages,
+        submission: submission,
+        settings: settings,
+        values: values,
+        errors: errors,
+        currentPage: currentPage,
+        isReview: isReview,
+        sequence: sequence,
+        progress: progress,
+        isLastPage: isLastPage,
+        isMultiPage: isMultiPage,
+        spam: spam ?? null,
+        templatePath: templatePath,
+        formId: formId,
+        headingLevel: headingLevel,
+    }, with_context = false) }}
+</div>
+{{ include(craft.formable.template('_shellClose', templatePath), {
+    form: form,
+    settings: settings,
+    formId: formId,
+    templatePath: templatePath,
+    showCaptcha: false,
+    showNav: false,
+}, with_context = false) }}

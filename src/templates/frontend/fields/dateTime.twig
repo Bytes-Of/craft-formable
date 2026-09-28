@@ -1,0 +1,10 @@
+<input type="{{ field.inputType }}"
+    id="{{ inputId }}"
+    name="{{ inputName }}"
+    class="formable-input formable-input--date"
+    value="{{ value }}"
+    {%- if field.inputMin %} min="{{ field.inputMin }}"{% endif %}
+    {%- if field.inputMax %} max="{{ field.inputMax }}"{% endif %}
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>

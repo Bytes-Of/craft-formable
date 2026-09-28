@@ -1,0 +1,91 @@
+{# @var since DateTime #}
+{# @var until DateTime #}
+{# @var forms array of { form, submissions, spam } #}
+{# @var sites array of { name, submissions, spam } - empty on a single-site install #}
+{# @var totalSubmissions int #}
+{# @var totalSpam int #}
+{# @var siteName string #}
+{#
+ # The weekly digest email body.
+ #
+ # Rendered by the Digest service in site mode and sent to the configured
+ # recipients. Styles are inlined and the markup kept to a plain table so it
+ # survives the email clients that strip everything else. Override
+ # `email/digest` in a site template root to reskin it.
+ #}
+{% set cell = 'padding:8px 12px;border-bottom:1px solid #e3e5e8;font-size:14px;' %}
+{% set num = cell ~ 'text-align:right;font-variant-numeric:tabular-nums;' %}
+
+<div style="font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;color:#20252b;max-width:640px;margin:0 auto;">
+    <h1 style="font-size:20px;margin:0 0 4px;">
+        {{ 'Weekly form digest'|t('formable') }}
+    </h1>
+    <p style="color:#6b7280;font-size:14px;margin:0 0 20px;">
+        {{ siteName }} &middot;
+        {{ 'Activity from {start} to {end}'|t('formable', {
+            start: since|date('M j, Y'),
+            end: until|date('M j, Y'),
+        }) }}
+    </p>
+
+    {% if forms is empty %}
+        <p style="font-size:14px;">
+            {{ 'No new submissions in the past 7 days.'|t('formable') }}
+        </p>
+    {% else %}
+        <table role="presentation" style="border-collapse:collapse;width:100%;border:1px solid #e3e5e8;border-radius:4px;">
+            <thead>
+                <tr style="background:#f3f4f6;">
+                    <th style="{{ cell }}text-align:left;font-weight:600;">{{ 'Form'|t('formable') }}</th>
+                    <th style="{{ num }}font-weight:600;">{{ 'New'|t('formable') }}</th>
+                    <th style="{{ num }}font-weight:600;">{{ 'Spam'|t('formable') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in forms %}
+                    <tr>
+                        <td style="{{ cell }}">{{ row.form.title }}</td>
+                        <td style="{{ num }}">{{ row.submissions }}</td>
+                        <td style="{{ num }}{{ row.spam > 0 ? 'color:#bb2f2f;' }}">{{ row.spam }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+            <tfoot>
+                <tr style="font-weight:600;background:#f3f4f6;">
+                    <td style="{{ cell }}border-bottom:0;">{{ 'Total'|t('formable') }}</td>
+                    <td style="{{ num }}border-bottom:0;">{{ totalSubmissions }}</td>
+                    <td style="{{ num }}border-bottom:0;">{{ totalSpam }}</td>
+                </tr>
+            </tfoot>
+        </table>
+    {% endif %}
+
+    {# The same week counted by where the submissions came from. Only present on
+       a multi-site install, where "which site is this form pulling from?" is a
+       question the per-form table cannot answer. #}
+    {% if sites is not empty %}
+        <h2 style="font-size:16px;margin:24px 0 8px;">{{ 'By site'|t('formable') }}</h2>
+        <table role="presentation" style="border-collapse:collapse;width:100%;border:1px solid #e3e5e8;border-radius:4px;">
+            <thead>
+                <tr style="background:#f3f4f6;">
+                    <th style="{{ cell }}text-align:left;font-weight:600;">{{ 'Site'|t('formable') }}</th>
+                    <th style="{{ num }}font-weight:600;">{{ 'New'|t('formable') }}</th>
+                    <th style="{{ num }}font-weight:600;">{{ 'Spam'|t('formable') }}</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in sites %}
+                    <tr>
+                        <td style="{{ cell }}">{{ row.name }}</td>
+                        <td style="{{ num }}">{{ row.submissions }}</td>
+                        <td style="{{ num }}{{ row.spam > 0 ? 'color:#bb2f2f;' }}">{{ row.spam }}</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+
+    <p style="color:#9ca3af;font-size:12px;margin:24px 0 0;">
+        {{ 'Sent by Formable. Manage this digest in the plugin settings.'|t('formable') }}
+    </p>
+</div>

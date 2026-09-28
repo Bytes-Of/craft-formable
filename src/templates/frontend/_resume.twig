@@ -1,0 +1,52 @@
+{#
+ # Standalone landing page for a save-and-resume link.
+ #
+ # A resume link is opened from an email, so it can't assume the submitter is
+ # on a page that already renders the form - this template is the whole
+ # response. It's intentionally minimal: a site that wants its own chrome
+ # around a resumed form can override `frontend/_resume` in its template pack,
+ # the same way it overrides any other template in the plugin's pack.
+ #
+ # Variables:
+ #   form        Form element
+ #   submission  the resumed (incomplete) submission
+ #   page        the page the submitter left off on
+ #   flowId      the flow id already attached to this session for the submission
+ #}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language|split('-')|first }}" dir="{{ craft.app.locale.orientation }}">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="robots" content="noindex, nofollow">
+    <title>{{ form.title ?? form.handle }}</title>
+    {# Lets the form's registered CSS/JS land in the page - without these hooks
+       renderForm's asset bundle would have nowhere to inject. #}
+    {{ head() }}
+</head>
+<body>
+    {{ beginBody() }}
+    <main class="formable-resume-page">
+        <h1>{{ form.title ?? form.handle }}</h1>
+        <p class="formable-resume-page__intro">
+            {{ 'Welcome back - pick up where you left off.'|t('formable') }}
+        </p>
+
+        {# Forces the `default` theme level for this render regardless of the
+           site's own `Settings::$themeLevel` - unlike an embedded form, this
+           page has no host chrome to inherit a font, a measure or (in dark
+           mode) a readable background from, so a site that has set the level
+           to `reset` or `none` would get an unpainted, browser-default page
+           here with nothing to fall back on. A site that wants this page
+           unstyled, or styled its own way, already has the override path the
+           doc comment above describes. #}
+        {{ craft.formable.renderForm(form, {
+            submission: submission,
+            page: page,
+            flowId: flowId,
+            theme: 'default',
+        }) }}
+    </main>
+    {{ endBody() }}
+</body>
+</html>

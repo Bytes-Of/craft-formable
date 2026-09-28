@@ -1,0 +1,169 @@
+{% extends '_layouts/cp' %}
+{% import '_includes/forms' as forms %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+    { label: 'Integrations'|t('formable'), url: cpUrl('formable/integrations') },
+] %}
+
+{% set fullPageForm = true %}
+
+{% block content %}
+    {% if not isPro %}
+        {% import 'formable/_includes/upgradeBadge' as upgrade %}
+        {{ upgrade.styles() }}
+        {{ upgrade.prompt('Integrations'|t('formable')) }}
+        <p class="light">
+            {{ 'Save your connection now - this form will forward to it once you upgrade to Pro.'|t('formable') }}
+        </p>
+    {% endif %}
+
+    <input type="hidden" name="action" value="formable/integrations/save">
+    {{ redirectInput('formable/integrations') }}
+    {% if not isNew %}{{ hiddenInput('integrationId', integration.id) }}{% endif %}
+    {{ hiddenInput('type', integration.type) }}
+
+    <p class="light">{{ 'Type'|t('formable') }}: <strong>{{ typeName }}</strong></p>
+
+    {{ forms.textField({
+        first: true,
+        label: 'Name'|t('formable'),
+        instructions: 'What this connection is called in the control panel and the form builder.'|t('formable'),
+        id: 'name',
+        name: 'name',
+        value: integration.name,
+        errors: integration.getErrors('name'),
+        required: true,
+    }) }}
+
+    {{ forms.textField({
+        label: 'Handle'|t('formable'),
+        instructions: 'How forms reference this integration. Leave blank to generate one from the name.'|t('formable'),
+        id: 'handle',
+        name: 'handle',
+        class: 'code',
+        value: integration.handle,
+        errors: integration.getErrors('handle'),
+    }) }}
+
+    {{ forms.lightswitchField({
+        label: 'Enabled'|t('formable'),
+        instructions: 'Only enabled integrations can be switched on per form.'|t('formable'),
+        id: 'enabled',
+        name: 'enabled',
+        on: integration.enabled,
+    }) }}
+
+    <hr>
+
+    <h2>{{ 'Connection'|t('formable') }}</h2>
+
+    {% for control in schema %}
+        {% set fieldName = 'settings[' ~ control.name ~ ']' %}
+        {% set fieldValue = settings[control.name] ?? (control.default ?? '') %}
+
+        {% if control.secret ?? false %}
+            {{ forms.autosuggestField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                id: control.name,
+                name: fieldName,
+                suggestEnvVars: true,
+                value: fieldValue,
+                required: control.required ?? false,
+            }) }}
+        {% elseif control.type == 'lightswitch' %}
+            {{ forms.lightswitchField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                id: control.name,
+                name: fieldName,
+                on: fieldValue ? true : false,
+            }) }}
+        {% elseif control.type == 'select' %}
+            {{ forms.selectField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                id: control.name,
+                name: fieldName,
+                options: control.options ?? [],
+                value: fieldValue,
+            }) }}
+        {% elseif control.type == 'textarea' %}
+            {{ forms.textareaField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                id: control.name,
+                name: fieldName,
+                value: fieldValue,
+                required: control.required ?? false,
+            }) }}
+        {% elseif control.type == 'number' %}
+            {{ forms.textField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                type: 'number',
+                id: control.name,
+                name: fieldName,
+                value: fieldValue,
+                required: control.required ?? false,
+            }) }}
+        {% else %}
+            {{ forms.textField({
+                label: control.label,
+                instructions: control.instructions ?? null,
+                id: control.name,
+                name: fieldName,
+                value: fieldValue,
+                required: control.required ?? false,
+            }) }}
+        {% endif %}
+    {% endfor %}
+
+    <hr>
+
+    <div class="flex">
+        <button type="button" id="formable-test-connection" class="btn">{{ 'Test connection'|t('formable') }}</button>
+        <span id="formable-test-result" class="light"></span>
+    </div>
+{% endblock %}
+
+{% js %}
+(function () {
+    var button = document.getElementById('formable-test-connection');
+    var result = document.getElementById('formable-test-result');
+
+    if (!button) {
+        return;
+    }
+
+    button.addEventListener('click', function () {
+        var settings = {};
+
+        document.querySelectorAll('[name^="settings["]').forEach(function (input) {
+            var match = input.name.match(/^settings\[(.+)\]$/);
+
+            if (!match) {
+                return;
+            }
+
+            settings[match[1]] = input.type === 'checkbox' ? (input.checked ? '1' : '') : input.value;
+        });
+
+        button.setAttribute('disabled', 'disabled');
+        result.textContent = {{ 'Testing…'|t('formable')|json_encode|raw }};
+
+        Craft.sendActionRequest('POST', 'formable/integrations/test-connection', {
+            data: { type: {{ integration.type|json_encode|raw }}, settings: settings },
+        }).then(function (response) {
+            result.textContent = response.data.message;
+            result.style.color = response.data.success ? '' : '#cf1124';
+        }).catch(function (error) {
+            result.textContent = (error.response && error.response.data && error.response.data.message) || {{ 'Connection failed.'|t('formable')|json_encode|raw }};
+            result.style.color = '#cf1124';
+        }).finally(function () {
+            button.removeAttribute('disabled');
+        });
+    });
+})();
+{% endjs %}

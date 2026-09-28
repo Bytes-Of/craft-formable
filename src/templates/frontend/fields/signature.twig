@@ -1,0 +1,44 @@
+{# Progressive enhancement: the canvas is drawn on by the front-end bundle,
+ # which writes the data URL into the hidden input. The visible text input is
+ # the accessible route - a keyboard, screen-reader, switch or voice user types
+ # their name and the bundle renders it to the same canvas, producing the same
+ # PNG data URL, so the stored value and every downstream consumer are
+ # unchanged. Without JS the field degrades to a plain text input the visitor
+ # can still type into rather than a dead canvas. #}
+{% set hintId = "#{inputId}-hint" %}
+{% set signatureDescribedBy = describedBy ? "#{hintId} #{describedBy}" : hintId %}
+<div class="formable-signature"
+    data-formable-signature
+    data-width="{{ field.canvasWidth }}"
+    data-height="{{ field.canvasHeight }}"
+    data-pen-color="{{ field.penColor }}"
+    data-background-color="{{ field.backgroundColor }}"
+    data-signed-label="{{ 'Signature captured'|t('formable') }}"
+    data-cleared-label="{{ 'Signature cleared'|t('formable') }}">
+    <canvas class="formable-signature__canvas"
+        width="{{ field.canvasWidth }}"
+        height="{{ field.canvasHeight }}"
+        role="img"
+        aria-label="{{ 'Signature drawing area for {label}'|t('formable', { label: field.label }) }}"></canvas>
+    <p class="formable-signature__hint" id="{{ hintId }}">
+        {{ 'Draw your signature in the box above, or type your name below to have it rendered as a signature.'|t('formable') }}
+    </p>
+    <input type="text"
+        class="formable-signature__typed"
+        id="{{ inputId }}"
+        data-formable-signature-typed
+        autocomplete="off"
+        autocapitalize="words"
+        aria-describedby="{{ signatureDescribedBy }}"
+        {%- if field.required %} aria-required="true"{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+    <button type="button"
+        class="formable-button formable-button--secondary formable-button--sm formable-signature__clear"
+        data-formable-signature-clear>
+        {{ 'Clear signature'|t('formable') }}
+    </button>
+    <input type="hidden"
+        id="{{ inputId }}-value"
+        name="{{ inputName }}"
+        value="{{ value }}">
+</div>

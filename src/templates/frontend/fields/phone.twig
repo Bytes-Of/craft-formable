@@ -1,0 +1,10 @@
+<input type="tel"
+    id="{{ inputId }}"
+    name="{{ inputName }}"
+    class="formable-input formable-input--phone"
+    value="{{ value }}"
+    autocomplete="tel"
+    {%- if field.placeholder %} placeholder="{{ field.placeholder }}"{% endif %}
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>

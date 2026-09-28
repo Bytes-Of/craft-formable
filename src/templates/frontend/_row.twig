@@ -1,0 +1,37 @@
+{#
+ # A row of side-by-side fields.
+ #
+ # The row's field count is exposed as a data attribute rather than baked into
+ # a class per width, so the optional theme can lay it out with a grid and a
+ # site's own CSS has a single hook to target.
+ #
+ # `data-formable-row-widths` is added only when a field in the row sets an
+ # explicit `width` (anything but `auto`); the theme switches that row from an
+ # equal-split grid to a flex layout where the sized fields take their fraction
+ # and the `auto` ones share the rest. An all-`auto` row emits nothing new and
+ # renders exactly as before.
+ #
+ # Variables:
+ #   form, row, values, errors, templatePath
+ #   formId  this render's unique form id (see `form.twig`), forwarded to
+ #           `_field` so its `inputId` default doesn't collide with another
+ #           render of the same form on the page
+ #   row.fields are FormField instances - the rendering service instantiates
+ #   them, so templates never touch the raw layout JSON.
+ #}
+{% set fields = row.fields ?? [] %}
+{% if fields|length %}
+    {%- set hasCustomWidths = fields|filter(field => field.width|default('auto') != 'auto')|length > 0 %}
+    <div class="formable-row" data-formable-row-fields="{{ fields|length }}"{{ hasCustomWidths ? ' data-formable-row-widths' : '' }}>
+        {% for field in fields %}
+            {{ include(craft.formable.template('_field', templatePath), {
+                form: form,
+                field: field,
+                value: field.hasValue ? (values[field.handle] ?? field.defaultValue) : null,
+                errors: errors[field.handle] ?? [],
+                templatePath: templatePath,
+                formId: formId,
+            }, with_context = false) }}
+        {% endfor %}
+    </div>
+{% endif %}

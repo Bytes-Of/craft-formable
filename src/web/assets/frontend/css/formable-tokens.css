@@ -1,0 +1,837 @@
+/**
+ * Formable design tokens.
+ *
+ * Primitives and semantics live here as a `--formable-*` custom property,
+ * declared on `:root` **only** - `.formable-form`, `.formable-success`,
+ * `.formable-closed` and `.formable-resume-page` carry no declaration of
+ * their own for either tier, and inherit it. This is deliberate, not an
+ * oversight: a `var()` reference is substituted using the custom property
+ * values in scope on the element that actually consumes it, not the element
+ * where the reference was written, so `.formable-form`'s `color:
+ * var(--formable-text)` re-resolves `--formable-text` against whichever
+ * ancestor last touched that name - `:root`, a wrapper a site wrote, or the
+ * form itself. A literal re-declaration anywhere between `:root` and the
+ * consuming rule would break exactly that: the element's own value always
+ * wins over an inherited one, however it was written, so a form that
+ * re-declared every token itself, even at identical defaults, made a `:root`
+ * or wrapper override invisible to everything inside it. See
+ * `internal/decisions/0070`. The namespace is `--formable-*` throughout, so a
+ * `:root` declaration adds nothing a site can collide with.
+ *
+ * **Component tokens are different, and carry no default here at all** - see
+ * the comment where the component tier used to be declared, and
+ * `internal/decisions/0073`. A named indirection like
+ * `--formable-input-border: var(--formable-border)`, if it were declared at
+ * `:root` the same way primitives and semantics are, would only ever resolve
+ * once, at `:root` itself - a `var()` reference re-resolves fresh at the
+ * element that consumes it, but `--formable-input-border`'s own declaration
+ * *is* that consumption for the semantic tier, and it isn't declared anywhere
+ * a wrapper's override of `--formable-border` could reach. `formable-theme.css`
+ * instead reads every component name with its semantic fallback inline -
+ * `border-color: var(--formable-input-border, var(--formable-border))` - so
+ * the fallback resolves fresh at `.formable-input` itself, the same as a
+ * direct semantic consumption does, while a site setting
+ * `--formable-input-border` anywhere still wins outright as the first
+ * alternative.
+ *
+ * This file is registered ahead of `formable-contract.css`, `formable-reset.css`
+ * and `formable-theme.css`, so the cascade-layer order for every Formable
+ * style is declared here, weakest first:
+ *
+ *   formable.tokens    this file
+ *   formable.reset     the a11y contract plus layout - `formable-reset.css`
+ *   formable.theme     everything `formable-theme.css` paints
+ *   formable.contract  the a11y contract alone - `formable-contract.css`
+ *
+ * `formable.contract` sits last on purpose: layer order is precedence order, so
+ * the accessibility contract - `.formable-visually-hidden`, `[hidden]` /
+ * `.formable-field--hidden`, the focus-ring shape - has to be the strongest
+ * thing Formable ships, not the weakest, or a later paint rule touching
+ * `position` / `clip-path` / `display` on the same element could silently turn
+ * a screen-reader-only label into visible clutter. See
+ * `internal/decisions/0059`. It carries design principle 7 ("the contract is
+ * not optional; the paint is") into the cascade itself, and means `reset` no
+ * longer has to re-assert its `[hidden]` rules against its own layout.
+ *
+ * Anything a site writes unlayered beats all four with no specificity fight
+ * and no `!important`.
+ *
+ * The colour scale is three-tier: primitive ramps, semantic tokens that point
+ * at them, and component tokens that point at the semantics - a site rebrands
+ * by overriding a few primitives (at `:root`), retints one surface by
+ * overriding a semantic (at `:root`, a wrapper, or the form), or retints a
+ * single component (the inputs, say) without moving any other by overriding
+ * that component's own tokens (same three places). `formable-theme.css`'s
+ * rules read the component tier exclusively; see `internal/decisions/0047`.
+ * Waves 2.2-2.4 added the spacing, type, radius, border, shadow and motion
+ * scales below, and 2.6 the control-density hooks.
+ */
+
+@layer formable.tokens, formable.reset, formable.theme, formable.contract;
+
+@layer formable.tokens {
+  :root {
+    /* The one knob every rung of the spacing, control-height and type scales
+       below is a `calc()` multiple of. A host that shrinks its root font size
+       (the `html { font-size: 62.5% }` trick, to get a `1rem = 10px` base for
+       hand-written `rem` values elsewhere on the page) shrinks every one of
+       those rungs with it, since they're all `rem`-based - hints and step
+       labels drop to single-digit pixels while the host's own text, sized in
+       `em` or a literal pixel value to compensate for the same trick, does
+       not. Overriding this one token (to `0.4rem`, undoing a 62.5% root the
+       same way the host's own body text override does) is the fix, in one
+       declaration, instead of every downstream token needing its own. See
+       [[frontend-embeddability-review]] chunk 11 (M11). */
+    --formable-unit: 0.25rem;
+
+    /* Spacing scale. One step per rung of visual hierarchy, from the tightest
+       label-to-control gap up to the space between major regions. `-6` is the
+       old single `--formable-gap` value, kept for the sites already
+       overriding it - see the rhythm tokens below. Steps by a constant
+       `--formable-unit` from `-3` through `-9`, then by two units above that -
+       the same shape as the increment doubling once magnitude does, rather
+       than the old scale's ratios wandering between 1.25x and 1.5x rung to
+       rung. `-7` (6 units) and `-9` (8 units) fill gaps the old 8-rung scale
+       skipped entirely; every rung below `-7` keeps its old computed value,
+       so this only inserts steps rather than moving existing ones. See
+       `internal/decisions/0046`. Each is a multiple of `--formable-unit`
+       chosen so the default (`0.25rem`) reproduces the exact literal this
+       rung shipped with before this token existed. */
+    --formable-space-1: calc(var(--formable-unit) * 1);
+    --formable-space-2: calc(var(--formable-unit) * 1.5);
+    --formable-space-3: calc(var(--formable-unit) * 2);
+    --formable-space-4: calc(var(--formable-unit) * 3);
+    --formable-space-5: calc(var(--formable-unit) * 4);
+    --formable-space-6: calc(var(--formable-unit) * 5);
+    --formable-space-7: calc(var(--formable-unit) * 6);
+    --formable-space-8: calc(var(--formable-unit) * 7);
+    --formable-space-9: calc(var(--formable-unit) * 8);
+    --formable-space-10: calc(var(--formable-unit) * 10);
+
+    /* Rhythm. One `--formable-gap` used to govern every level of nesting at
+       once - field-to-field, row-to-row and page-to-page all read the same
+       number, so no amount of spacing told a reader which fields belonged
+       together. Three rungs instead, each read by exactly one level of
+       `formable-reset.css` nesting: `.formable-row` (fields sharing a row),
+       `.formable-page` (rows stacked in a page) and `.formable-form` /
+       `.formable-review` (the form's major regions - the error summary, the
+       step content, the review's per-page blocks). `--formable-gap` stays as
+       a back-compat alias feeding the middle rung, the same pattern
+       `--formable-radius` and `--formable-muted` already use below - a site
+       overriding it keeps affecting row-to-row spacing, just not the other
+       two levels a single token was never precise enough to separate. See
+       `internal/decisions/0037`. */
+    --formable-field-gap: var(--formable-space-5);
+    --formable-gap: var(--formable-space-8);
+    --formable-group-gap: var(--formable-gap);
+    --formable-section-gap: var(--formable-space-10);
+
+    /* The floor `[data-formable-step]`'s container-query containment can
+       shrink the form to before a width-to-content host (a `<dialog>`, a
+       popover) forces it back open again. Containment gives the step no
+       intrinsic size of its own to report upward, so without this a form
+       embedded in one of those hosts collapses to nothing instead of sizing
+       to its content. `100vw` is the ceiling so the floor itself can never
+       force a horizontal scrollbar on a viewport narrower than the default.
+       See [[frontend-embeddability-review]] chunk 5. */
+    --formable-min-inline-size: 20rem;
+
+    /* Caps how wide a run of prose gets before it's capped at a readable line
+       length - instructions and error text, not a field's own control (an
+       input's width is the row's business, not typography's). `60ch` is a
+       conventional prose measure; a form living in a `960px` layout scenario
+       or wider is the case this actually bites, since nothing else in the
+       system limits line length. See [[frontend-embeddability-review]]
+       chunk 9. */
+    --formable-measure: 60ch;
+
+    /* Caps how wide the whole form gets, independent of `--formable-measure`
+       (which only bounds prose, not a row of several fields side by side) -
+       `none` by default, so a form dropped into a host with no opinion of its
+       own keeps filling the container exactly as it always has.
+       `margin-inline: auto` on `.formable-form` (`formable-reset.css`) is a
+       no-op at the default `none` and centres the form once this is set to
+       something narrower than the container, rather than leaving it pinned
+       to the start edge. A form embedded in a full-bleed or very wide layout
+       is the case this is for; the recommended measure is documented in
+       `docs/theming.md`. See [[frontend-embeddability-review]] chunk 11
+       (M6). */
+    --formable-form-max-inline-size: none;
+
+    /* How far above the step container and a linked-to field's own controls
+       (`fieldset`/`input`/`select`/`textarea`) to stop scrolling - `0` by
+       default, so nothing moves on a page with no sticky chrome. Set it to a
+       sticky host header's height so `swapStep()`'s `scrollIntoView()` and a
+       clicked error-summary link both stop below it instead of behind it.
+       See [[frontend-embeddability-review]] chunk 7. */
+    --formable-scroll-margin: 0;
+
+    /* Type scale. `font: inherit` stays on every control - the plugin ships no
+       font stack - so these are size, weight and line-height only. `-base` is
+       1rem for the site's own body size; the rungs below it carry the
+       supporting text (hints, table headers, step numbers), and the two above
+       it the in-page heading (`-lg`) and the step title (`-2xl`). `-xl` sits
+       between them, still used by the resume page's own body copy scale. The
+       step title is deliberately two rungs clear of an in-page heading so the
+       two read as different levels rather than the near-identical `-xl`/`-lg`
+       pair they were before `internal/decisions/0058`. */
+    --formable-font-size-xs: calc(var(--formable-unit) * 3.25);
+    --formable-font-size-sm: calc(var(--formable-unit) * 3.5);
+    --formable-font-size-base: calc(var(--formable-unit) * 4);
+    --formable-font-size-lg: calc(var(--formable-unit) * 4.5);
+    --formable-font-size-xl: calc(var(--formable-unit) * 5);
+    --formable-font-size-2xl: calc(var(--formable-unit) * 6);
+
+    --formable-font-weight-normal: 400;
+    --formable-font-weight-medium: 500;
+    --formable-font-weight-semibold: 600;
+
+    /* `-tight` is for headings, where the inherited body leading is too loose
+       once the text is this large. `-normal` is the leading the form owns on
+       label and instruction text (`internal/decisions/0058`): both can wrap,
+       and principle 6's "own the form's rhythm" covers the leading of wrapped
+       text the same way it covers the gaps between fields. */
+    --formable-line-height-tight: 1.3;
+    --formable-line-height-normal: 1.5;
+
+    /* Radius scale. `-md` is the old single `--formable-radius` value; the alias
+       below keeps existing site overrides of `--formable-radius` working. `-full`
+       is the pill radius the progress track and step numbers were hardcoding as
+       `999px`. */
+    --formable-radius-sm: calc(var(--formable-unit) * 1);
+    --formable-radius-md: calc(var(--formable-unit) * 1.5);
+    --formable-radius-lg: calc(var(--formable-unit) * 2);
+    --formable-radius-full: 999px;
+
+    --formable-radius: var(--formable-radius-md);
+
+    /* One control-border width for the whole system, so a site can thicken every
+       border by overriding a single token. */
+    --formable-border-width: 1px;
+
+    /* Elevation language. Declared here so it lives in one place; Wave 4 is the
+       first to paint with it. */
+    --formable-shadow-sm: 0 1px 2px rgb(0 0 0 / 6%);
+    --formable-shadow-md: 0 4px 12px rgb(0 0 0 / 10%);
+
+    /* Motion. `-base` is the old hardcoded `0.25s`; `-fast` is for small state
+       changes (hover, focus). The easing curve replaces the bare `ease`
+       keyword. */
+    --formable-duration-fast: 0.15s;
+    --formable-duration-base: 0.25s;
+    --formable-ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* Control density. The padding tokens carry the old literal `0.5rem 0.625rem`
+       from `.formable-input`; the button and the resume-email input reuse the
+       `-y` value and keep their own wider `-x`. `--formable-control-height` is
+       declared here so the density language lives in one place - Wave 4 is the
+       first to paint with it (the select needs an explicit height to line up
+       with text inputs). `FormSettings::$density` overrides these (and the gap)
+       on `.formable-form--compact`, in the block below. */
+    --formable-control-height: calc(var(--formable-unit) * 10);
+    --formable-control-padding-x: calc(var(--formable-unit) * 2.5);
+    --formable-control-padding-y: calc(var(--formable-unit) * 2);
+
+    /* Progress indicator geometry. The bar's track height, and the diameter of
+       a stepped indicator's numbered circle - the second of which the theme's
+       connector-line arithmetic reads, so the line still meets the circles
+       after a site resizes them. */
+    --formable-progress-track-height: calc(var(--formable-unit) * 2);
+    --formable-progress-step-size: calc(var(--formable-unit) * 7);
+
+    /* --------------------------------------------------------------- colour */
+
+    /* Primitives: the raw ramps, the only place a literal colour is written.
+       A rebrand overrides a handful of these - usually one accent rung, and
+       the neutrals for a warmer or cooler grey - and every rule downstream
+       follows because it reads a semantic token, never a primitive. The
+       neutral ramp is achromatic (equal R/G/B at every rung) and monotonic -
+       every rung lighter than the one below it, every numbered step present
+       from `-50` to `-950` - per `internal/decisions/0044`. It used to mix two
+       grey families (a blue-tinted one for the light rungs, a desaturated one
+       for the rest) and skip `-300`/`-500`, and `-900` was lighter than `-700`
+       and `-800` - a trap for anyone who read the numbers as depth order. The
+       danger/success `-500`/`-950` rungs are unrelated to this ramp; they're
+       the dark-mode counterparts to the light theme's `-600`/`-50`, brighter
+       text and a muted tinted surface for a palette that otherwise reads as
+       too dim or too glaring once the surface itself goes dark. */
+    --formable-color-neutral-50: #fafafa;
+    --formable-color-neutral-100: #f0f0f0;
+    --formable-color-neutral-200: #e0e0e0;
+    --formable-color-neutral-300: #c7c7c7;
+    --formable-color-neutral-400: #a3a3a3;
+    --formable-color-neutral-500: #808080;
+    --formable-color-neutral-600: #636363;
+    --formable-color-neutral-700: #4a4a4a;
+    --formable-color-neutral-800: #333;
+    --formable-color-neutral-900: #1f1f1f;
+    --formable-color-neutral-950: #121212;
+
+    --formable-color-accent-500: #3b82f6;
+    --formable-color-accent-600: #2563eb;
+
+    --formable-color-danger-50: #fef2f2;
+    --formable-color-danger-500: #ef4444;
+    --formable-color-danger-600: #dc2626;
+    --formable-color-danger-700: #b91c1c;
+    --formable-color-danger-950: #3a1215;
+
+    --formable-color-success-50: #f0fdf4;
+    --formable-color-success-500: #4ade80;
+    --formable-color-success-600: #16a34a;
+    --formable-color-success-700: #15803d;
+    --formable-color-success-950: #0f2b1a;
+
+    /* Semantics: what every rule in `formable.css` paints with. Re-point these
+       to restyle the form; the primitives keep the values consistent. The five
+       pre-1.1 names that some sites already override live in the back-compat
+       block below and feed the matching semantic token, so those overrides
+       still land. */
+    --formable-surface: #fff;
+    --formable-surface-raised: var(--formable-color-neutral-50);
+
+    /* Anchored the same way as `--formable-surface`: an absolute value, not
+       `inherit`. `.formable-input` paints `--formable-surface` behind
+       `--formable-text`; while one was absolute and the other relative, a form
+       dropped into a dark page section rendered a white box holding the host
+       page's light text - invisible. The `default` theme is a light theme; a
+       form in a dark region opts into the dark palette with
+       `data-formable-scheme="dark"` (below), which repaints the pair together.
+       See `internal/decisions/0036`. */
+    --formable-text: var(--formable-color-neutral-950);
+    --formable-text-muted: var(--formable-muted);
+
+    --formable-border: var(--formable-color-neutral-500);
+    --formable-border-hover: var(--formable-color-neutral-600);
+
+    /* Unset by default, so every chain below resolves to today's value -
+       including the inverting dark-mode button - until someone sets a brand.
+
+       This is the path for a site that sets `--formable-brand` itself, from
+       its own stylesheet: `:root` is the element these declarations
+       substitute their `var()`s at, so a seed set there reaches all three.
+       A seed set on the *form* does not, which is why the CP palette emits
+       the resolved tokens instead of relying on this - 0091. */
+    --formable-border-focus: var(
+      --formable-brand,
+      var(--formable-color-accent-600)
+    );
+
+    --formable-button-primary-bg: var(
+      --formable-brand,
+      var(--formable-button-bg)
+    );
+    --formable-button-primary-bg-hover: var(--formable-color-neutral-950);
+    --formable-button-primary-text: var(--formable-button-text);
+
+    --formable-button-secondary-bg: transparent;
+    --formable-button-secondary-bg-hover: var(--formable-color-neutral-100);
+    --formable-button-secondary-border: var(--formable-border);
+    --formable-button-secondary-border-hover: var(--formable-border-hover);
+    --formable-button-secondary-text: var(--formable-text);
+
+    /* The ghost variant is the secondary one without the border - for controls
+       that sit inside other content (Edit in the review list, Remove in a table
+       row) where a third bordered box would be noise. Its own tokens rather
+       than a reuse of the secondary set, so a site can retint one without
+       moving the other. */
+    --formable-button-ghost-bg: transparent;
+    --formable-button-ghost-bg-hover: var(--formable-color-neutral-100);
+    --formable-button-ghost-text: var(--formable-text);
+
+    --formable-error: var(--formable-color-danger-700);
+    --formable-error-surface: var(--formable-error-bg);
+    --formable-success: var(--formable-color-success-700);
+    --formable-success-surface: var(--formable-success-bg);
+
+    --formable-track: var(--formable-color-neutral-200);
+    --formable-disabled-bg: var(--formable-color-neutral-100);
+
+    /* The travelled part of a progress indicator - the bar's fill, the current
+       step's circle, the connector behind it - reads the accent ramp directly
+       rather than the button colour. Per `internal/decisions/0045`, the button
+       went neutral (achromatic, inverting per colour scheme); the progress
+       indicator is one of the two places - the other is the focus ring - that
+       still carries the accent, so it stays put and doesn't follow the button's
+       flip. `--formable-progress-text` is the current step's number colour: its
+       own token, not `--formable-button-primary-text`, because that text now
+       inverts with the button while the accent fill behind this number does
+       not. `--track` above is the untravelled part of both shapes.
+
+       The done-state tick is a token because the theme paints it as a mask
+       rather than a background image (a data URI can't resolve `currentColor`,
+       and the glyph has to follow the fill colour), which also lets a site swap
+       it for its own mark without touching a selector. */
+    --formable-progress-fill: var(
+      --formable-brand,
+      var(--formable-color-accent-600)
+    );
+    --formable-progress-text: #fff;
+    --formable-progress-check: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M3.5 8.5l3 3 6-6'/%3E%3C/svg%3E");
+
+    /* The select's caret, painted as a mask for the same reason
+       `--formable-progress-check` is one: `<select>` takes no `::after`, so
+       `formable-theme.css` wraps it in `.formable-select` and masks this glyph
+       onto that wrapper's `::after` instead, filled with
+       `--formable-select-chevron-color`. Because a mask only reads the
+       shape's alpha channel, the stroke colour below is arbitrary and this
+       token needs no dark-mode or rebrand override - the fill token already
+       carries both. */
+    --formable-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");
+
+    /* Focus ring. Its own colour token, so a site can retint the ring without
+       moving the input's `border-focus` colour - and the reverse. Width and
+       offset match what the `:focus-visible` rules hardcoded before. */
+    --formable-focus-ring-width: 2px;
+    --formable-focus-ring-offset: 1px;
+    --formable-focus-ring-color: var(--formable-border-focus);
+
+    /* Components: the third tier - what an individual rule in `formable-
+       theme.css` actually paints with, each pointing at a semantic token
+       above. Before this tier, `formable-theme.css` read the semantics
+       directly, so `.formable-input`, the progress indicator's step circle
+       and the table's scroll-shadow fade all shared `--formable-surface` (and
+       `.formable-group`, the review card, the progress step and the table
+       header all shared `--formable-border`) for no reason beyond happening
+       to reuse the same literal value. Retinting "just the inputs" meant
+       retinting all of them. See `internal/decisions/0047`.
+
+       Grouped by what genuinely reads as one thing - the input-shaped box
+       covers every control that reads as a text box even when it isn't
+       literally an `<input>` (the multiselect combobox, the signature canvas
+       and its typed alternative, the save-and-resume email field), because a
+       rebrand of "the inputs" should move all of them together. The
+       progress indicator and the table are deliberately *not* part of that
+       group any more - they get their own tokens so a site can retint one
+       without the other.
+
+       Unlike primitives and semantics, none of these names are declared here
+       - `internal/decisions/0073`. Each is a pure override hook: a site that
+       sets one, anywhere in scope, wins outright the same as any other own
+       declaration; a site that sets none gets the semantic fallback named
+       below, read fresh at the rule that actually paints with it, in
+       `formable-theme.css`:
+
+       Input-shaped controls
+         --formable-input-bg              -> --formable-surface
+         --formable-input-bg-disabled     -> --formable-disabled-bg
+         --formable-input-text            -> --formable-text
+         --formable-input-text-disabled   -> --formable-text-muted
+         --formable-input-placeholder     -> --formable-text-muted
+         --formable-input-border          -> --formable-border
+         --formable-input-border-hover    -> --formable-border-hover
+         --formable-input-border-invalid  -> --formable-error
+         --formable-input-accent          -> --formable-text
+
+       A selectable row - a checkbox/radio option, an enhanced multi-select
+       option, the native multiselect's checked `<option>`
+         --formable-option-bg-hover          -> --formable-surface-raised
+         --formable-option-text-disabled     -> --formable-text-muted
+         --formable-select-chevron-color     -> --formable-text-muted
+
+       The enhanced multi-select's chip row and empty state - not
+       input-shaped, its own surface
+         --formable-multiselect-chip-bg           -> --formable-surface-raised
+         --formable-multiselect-chip-remove       -> --formable-text-muted
+         --formable-multiselect-chip-remove-hover -> --formable-text
+         --formable-multiselect-empty-text        -> --formable-text-muted
+
+       Field chrome - the label/hint text around a control, not the control
+       itself. Reused by the signature hint, the file-upload prompt, the
+       save-and-resume label and the standalone resume page's intro, which
+       are all the same "muted caption near a field" idea
+         --formable-field-required-text -> --formable-text-muted
+         --formable-field-hint-text     -> --formable-text-muted
+
+       Group / card boundary - the group wrapper, its no-group divider
+       fallback, and the review step's per-page card all read one token
+       because `formable-theme.css` already treats them as deliberately "the
+       same bordered chunk"
+         --formable-group-border -> --formable-border
+
+       A one-colour message box: the form error summary, the success screen,
+       the closed-form notice. Each state gets its own text/background pair
+       so a site can retint one without moving the other two
+         --formable-message-error-text    -> --formable-error
+         --formable-message-error-bg      -> --formable-error-surface
+         --formable-message-success-text  -> --formable-success
+         --formable-message-success-bg    -> --formable-success-surface
+         --formable-message-neutral-text   -> --formable-text-muted
+         --formable-message-neutral-bg     -> --formable-surface-raised
+         --formable-message-neutral-border -> --formable-border
+
+       File upload's drop target, drag-over highlight, uploaded-file chip and
+       rejection notice - the picker button itself already reads the button
+       component tier
+         --formable-file-dropzone-border -> --formable-border
+         --formable-file-dropzone-icon   -> --formable-text-muted
+         --formable-file-dragover-border -> --formable-border-focus
+         --formable-file-dragover-bg     -> --formable-surface-raised
+         --formable-file-chip-bg         -> --formable-surface-raised
+         --formable-file-notice-text     -> --formable-error
+         --formable-file-thumb-bg        -> --formable-surface-raised
+         --formable-file-thumb-border    -> --formable-border
+         --formable-file-thumb-icon      -> --formable-text-muted
+
+       Per-file upload progress. Its own pair, not a reuse of
+       `--formable-progress-*` below, so retinting the page's step/bar
+       indicator doesn't also move a file's upload bar and vice versa - the
+       same reasoning as every other component pair (`internal/decisions/
+       0047`). `-fill` still reads the accent primitive directly rather than
+       a semantic, matching `--formable-progress-fill`: per
+       `internal/decisions/0045` the accent ramp is reserved for the focus
+       ring and progress, and an in-flight upload is a progress indicator
+         --formable-file-progress-track-bg -> --formable-track
+         --formable-file-progress-fill     -> --formable-color-accent-600
+
+       Progress indicator - the concrete example above: this used to read
+       `--formable-surface` and `--formable-border` directly, coupling the
+       step circle to every input on the page
+         --formable-progress-label-text             -> --formable-text-muted
+         --formable-progress-track-bg               -> --formable-track
+         --formable-progress-step-bg                -> --formable-surface
+         --formable-progress-step-border            -> --formable-border
+         --formable-progress-step-text              -> --formable-text-muted
+         --formable-progress-step-label-text         -> --formable-text-muted
+         --formable-progress-step-label-text-current -> --formable-text
+
+         --formable-review-question-text -> --formable-text-muted
+
+       The signature pad's done-state border, once it has ink - its own token
+       rather than a reuse of the message component's, so retinting the
+       success message box doesn't also move a control that merely borrows
+       the same tone
+         --formable-signature-success-border -> --formable-success
+
+       Table - the scroll-shadow fade is the other concrete example above.
+       The shadow itself is `--formable-text` at low opacity rather than a
+       literal black: `color-mix()` against a token that's already near-black
+       in light mode and near-white in dark (same pair the primary button
+       inverts across) means the shadow inverts for free, with no entry in
+       either dark-mode block below - the alternative, a literal plus a dark
+       override, would be the exact duplication 2.8 already flags as a wart
+       elsewhere in this file
+         --formable-table-header-text   -> --formable-text-muted
+         --formable-table-header-border -> --formable-border
+         --formable-table-row-bg-alt    -> --formable-surface-raised
+         --formable-table-scroll-fade   -> --formable-surface
+         --formable-table-scroll-shadow -> color-mix(in srgb, var(--formable-text) 12%, transparent) */
+
+    /* Back-compat: the pre-1.1 names a site may already be overriding. Each
+       carries the value and the semantic token above reads through it, so an
+       existing `--formable-button-bg` (etc.) override keeps working. New work
+       targets the semantic names - do not add to this list.
+
+       `--formable-muted` reads `-600`, not `-900`: before `internal/decisions/
+       0044` rebuilt the ramp, `-900` *was* this mid-grey (a value the ramp
+       carried out of numeric order). Repointing the alias, not just fixing the
+       ramp, is what keeps the muted-text colour looking the same after the fix -
+       a site that instead overrides the `-900` primitive directly gets the
+       darker, correctly-ordered tone, called out in `CHANGELOG.md`. */
+    --formable-muted: var(--formable-color-neutral-600);
+
+    /* `--formable-button-bg` fed both the primary button and the progress
+       indicator before `internal/decisions/0045`; it now feeds only the
+       button - the progress fill reads the accent primitive directly, above.
+       A site that was overriding `--formable-button-bg` to retint its progress
+       bar needs to move that override to `--formable-progress-fill` or
+       `--formable-color-accent-600`; called out in `CHANGELOG.md`. */
+    --formable-button-bg: var(--formable-color-neutral-900);
+    --formable-button-text: #fff;
+    --formable-error-bg: var(--formable-color-danger-50);
+    --formable-success-bg: var(--formable-color-success-50);
+  }
+
+  /* Compact density. `FormSettings::$density` emits `formable-form--compact` on
+     the wrapper; this is the whole of what "compact" means - a shorter control,
+     tighter control padding, and a smaller gap at every rhythm rung. No rule in
+     `formable-theme.css` has a compact variant: every compact form is these
+     token values and nothing else, so the mode stays a one-line change and a
+     form left on the default `comfortable` never gets the class. Each rung
+     re-points at a lower spacing step rather than taking a literal, so a site
+     that rescaled the spacing steps keeps a proportional compact rhythm. This
+     block re-points `--formable-group-gap` directly, so on a compact form it
+     shadows the `:root` line that routes that rung through the `--formable-gap`
+     back-compat alias - a compact form takes all three rungs from here and a
+     site's `--formable-gap` override does not reach it, the same as it always
+     has. */
+  .formable-form--compact {
+    --formable-control-height: calc(var(--formable-unit) * 9);
+    --formable-control-padding-x: calc(var(--formable-unit) * 2);
+    --formable-control-padding-y: calc(var(--formable-unit) * 1.5);
+    --formable-field-gap: var(--formable-space-4);
+    --formable-group-gap: var(--formable-space-6);
+    --formable-section-gap: var(--formable-space-8);
+  }
+
+  /* Labels-left, the second variant axis (2.5/5.5). Same shape as compact
+     above - a value, not a rule, so it can sit in this layer. The row layout
+     it drives is a structural change, not a paint one, so those selectors
+     live in `formable-reset.css` instead and read this token; this block
+     owns only how wide the label column is. */
+  .formable-form--labels-left {
+    --formable-label-width: 9rem;
+  }
+
+  /* Palette corner radius (`Palette::$radius`, 0089). Same
+     pure-token-override shape as `--compact` and `--labels-left` above -
+     `internal/decisions/0048` - so `formable-theme.css` needs no variant rule
+     of its own: every `border-radius: var(--formable-radius)` in that file
+     already picks this up. `--soft` restates today's default explicitly
+     rather than omitting a block for it, so a form nested inside a wrapper
+     that changed `--formable-radius-md` can still opt back to the shipped
+     scale. `--round` reaches for the pill radius the progress track already
+     uses, not a fourth radius rung - a form embracing "round" wants a single
+     unambiguous endpoint, not one more step next to `-lg`. */
+  .formable-form--radius-sharp {
+    --formable-radius: 0;
+  }
+
+  .formable-form--radius-soft {
+    --formable-radius: var(--formable-radius-md);
+  }
+
+  .formable-form--radius-round {
+    --formable-radius: var(--formable-radius-full);
+  }
+
+  /* Dark mode repaints only the semantic tier, so every rule in
+     `formable-theme.css` gets a dark palette for free with no selector of its
+     own changing. Structural tokens (spacing, radius, type, motion) are
+     untouched - dark mode is a colour opinion, not a layout one. The primary
+     button is achromatic (`internal/decisions/0045`), so it inverts rather
+     than keeping a fixed fill: near-black on a light page, near-white on a
+     dark one, always the highest-contrast neutral available against its own
+     surface. Secondary and ghost read `--formable-text` for their own colour,
+     which this block already repaints, so neither needs an override of its
+     own here. The focus ring is the one place accent survives into dark mode
+     - `accent-600` is too dim against a near-black surface, so it moves to
+     `accent-500`; the progress fill deliberately does not get the same
+     brightening; it's one literal accent value in both schemes, unchanged by
+     this block, same as it rendered before 0045 split it from the button.
+     Back-compat names (`--formable-error-bg` and the rest) are deliberately
+     not repainted here - dark mode is new behaviour, not a promise made to
+     sites already overriding those names - so this block targets the
+     semantic tokens only, same as everywhere else past 2.5.
+
+     Three blocks, one palette, forced against OS preference or back the
+     other way. `:root` above carries every public token's light default and
+     nothing below it re-declares that default on `.formable-form`,
+     `.formable-success`, `.formable-closed` or `.formable-resume-page` - so,
+     per the file header, a rule inside any of them re-resolves a token
+     against whichever ancestor last touched it. That is what lets
+     `data-formable-scheme` be a **plain attribute selector**, matched
+     wherever it lands: `<html>`, a wrapper `<div>`, the form itself, or a
+     surface that renders outside `<form>` - an ancestor forcing the scheme
+     reaches every surface under it with no selector of its own. Opting one
+     element back the other way (a form pinned light inside a page forced
+     dark, or vice versa) is just the matching `[data-formable-scheme="…"]`
+     rule applying directly to that element, which breaks its inheritance
+     from the forcing ancestor the same way any own-property declaration
+     does. `prefers-color-scheme` only ever addresses `:root`, so only its
+     media block needs the `:not([="light"])` guard, to let an explicit light
+     override on `:root` itself beat a dark OS preference; the forced-dark
+     block below needs no guard - it already matches only the attribute value
+     it names. The media block and forced-dark carry the *same* semantic-tier
+     values and must stay in sync - `light-dark()` would remove some of the
+     duplication but needs `color-scheme` on `:root`, and repainting a site's
+     own scrollbars and native controls is not the plugin's business.
+     `tests/Unit/DarkModeTokensTest.php` enforces the sync directly instead of
+     trusting this comment. `formable-theme.css` carries the matching
+     `color-scheme` override so native chrome follows a forced scheme too.
+     Public contract, and generalised to any ancestor by
+     `internal/decisions/0070` - see `docs/theming.md`.
+
+     Forced-light is different, and gated rather than a bare attribute
+     selector - see the comment on it below and `internal/decisions/0072`.
+     `Settings::$colorScheme` defaults to `light` (`internal/decisions/0071`),
+     so unlike a forced-dark ancestor (something a site deliberately wrote),
+     every rendered form carries `data-formable-scheme="light"` whether or
+     not anything is actually forcing dark nearby. A bare
+     `[data-formable-scheme='light']` selector can't tell those two cases
+     apart - it would restate all eighteen tokens as this element's own
+     declaration either way, which shadows a `:root` or wrapper rebrand of
+     `--formable-surface` or `--formable-border` on *every* default form, not
+     only the rare one actually opting out of a real dark force. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-formable-scheme='light']) {
+      --formable-surface: var(--formable-color-neutral-950);
+      --formable-surface-raised: var(--formable-color-neutral-800);
+
+      --formable-text: var(--formable-color-neutral-50);
+      --formable-text-muted: var(--formable-color-neutral-400);
+
+      --formable-border: var(--formable-color-neutral-500);
+      --formable-border-hover: var(--formable-color-neutral-600);
+      --formable-border-focus: var(
+        --formable-brand,
+        var(--formable-color-accent-500)
+      );
+
+      --formable-button-primary-bg: var(
+        --formable-brand,
+        var(--formable-color-neutral-50)
+      );
+      --formable-button-primary-bg-hover: var(--formable-color-neutral-200);
+      --formable-button-primary-text: var(--formable-color-neutral-950);
+
+      --formable-button-secondary-bg-hover: var(--formable-color-neutral-800);
+      --formable-button-ghost-bg-hover: var(--formable-color-neutral-800);
+
+      --formable-error: var(--formable-color-danger-500);
+      --formable-error-surface: var(--formable-color-danger-950);
+      --formable-success: var(--formable-color-success-500);
+      --formable-success-surface: var(--formable-color-success-950);
+
+      --formable-track: var(--formable-color-neutral-700);
+      --formable-disabled-bg: var(--formable-color-neutral-800);
+    }
+  }
+
+  /* Forced dark - the same values as the media block above, kept adjacent so
+     a change to one is an obvious prompt to change the other. */
+  [data-formable-scheme='dark'] {
+    --formable-surface: var(--formable-color-neutral-950);
+    --formable-surface-raised: var(--formable-color-neutral-800);
+
+    --formable-text: var(--formable-color-neutral-50);
+    --formable-text-muted: var(--formable-color-neutral-400);
+
+    --formable-border: var(--formable-color-neutral-500);
+    --formable-border-hover: var(--formable-color-neutral-600);
+    --formable-border-focus: var(
+      --formable-brand,
+      var(--formable-color-accent-500)
+    );
+
+    --formable-button-primary-bg: var(
+      --formable-brand,
+      var(--formable-color-neutral-50)
+    );
+    --formable-button-primary-bg-hover: var(--formable-color-neutral-200);
+    --formable-button-primary-text: var(--formable-color-neutral-950);
+
+    --formable-button-secondary-bg-hover: var(--formable-color-neutral-800);
+    --formable-button-ghost-bg-hover: var(--formable-color-neutral-800);
+
+    --formable-error: var(--formable-color-danger-500);
+    --formable-error-surface: var(--formable-color-danger-950);
+    --formable-success: var(--formable-color-success-500);
+    --formable-success-surface: var(--formable-color-success-950);
+
+    --formable-track: var(--formable-color-neutral-700);
+    --formable-disabled-bg: var(--formable-color-neutral-800);
+  }
+
+  /* Forced light - the mirror of forced dark, restating `:root`'s own light
+     defaults so one element can opt back out of an ancestor forcing dark (or
+     a dark OS preference, the media-guarded copy below). Restating those
+     defaults directly on the opted-out element breaks its inheritance from
+     whichever ancestor forced dark, the same mechanism forced-dark above
+     uses in reverse - but only where that's actually needed.
+
+     Gated to `[data-formable-scheme='dark'] [data-formable-scheme='light']`
+     rather than a bare `[data-formable-scheme='light']` selector, because
+     `light` is also `Settings::$colorScheme`'s default
+     (`internal/decisions/0071`): every rendered form carries this attribute,
+     including the common case where nothing nearby is forcing dark at all.
+     An own-property declaration beats an inherited value regardless of *why*
+     the inherited value was in scope, so a bare selector restating all
+     eighteen tokens on every light-attributed element would shadow a `:root`
+     or wrapper rebrand of `--formable-surface` or `--formable-border` on
+     every default form, not only the one actually opting out of a real dark
+     force - internal/decisions/0072, N1 of
+     [[frontend-embeddability-review]]. Requiring an actual
+     `[data-formable-scheme='dark']` ancestor means a plain default-light
+     form - nothing forcing dark anywhere above it - gets no declaration of
+     its own for these tokens at all, so a `:root`/wrapper override reaches
+     it exactly as the primitive and component tiers already do. Kept in
+     sync with `:root`'s own declarations by the same test as forced-dark. */
+  [data-formable-scheme='dark'] [data-formable-scheme='light'] {
+    --formable-surface: #fff;
+    --formable-surface-raised: var(--formable-color-neutral-50);
+
+    --formable-text: var(--formable-color-neutral-950);
+    --formable-text-muted: var(--formable-muted);
+
+    --formable-border: var(--formable-color-neutral-500);
+    --formable-border-hover: var(--formable-color-neutral-600);
+    --formable-border-focus: var(
+      --formable-brand,
+      var(--formable-color-accent-600)
+    );
+
+    --formable-button-primary-bg: var(
+      --formable-brand,
+      var(--formable-button-bg)
+    );
+    --formable-button-primary-bg-hover: var(--formable-color-neutral-950);
+    --formable-button-primary-text: var(--formable-button-text);
+
+    --formable-button-secondary-bg-hover: var(--formable-color-neutral-100);
+    --formable-button-ghost-bg-hover: var(--formable-color-neutral-100);
+
+    --formable-error: var(--formable-color-danger-700);
+    --formable-error-surface: var(--formable-error-bg);
+    --formable-success: var(--formable-color-success-700);
+    --formable-success-surface: var(--formable-success-bg);
+
+    --formable-track: var(--formable-color-neutral-200);
+    --formable-disabled-bg: var(--formable-color-neutral-100);
+  }
+
+  /* The same opt-out, for the one dark source the selector above can't see:
+     a plain `@media (prefers-color-scheme: dark)` has no
+     `[data-formable-scheme='dark']` attribute anywhere in the ancestor chain
+     to match against - the media block earlier in this file repaints `:root`
+     itself directly. Guarded the same way that block is, so an explicit
+     light override on `:root` never fights this rule for the same case. */
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-formable-scheme='light']) [data-formable-scheme='light'] {
+      --formable-surface: #fff;
+      --formable-surface-raised: var(--formable-color-neutral-50);
+
+      --formable-text: var(--formable-color-neutral-950);
+      --formable-text-muted: var(--formable-muted);
+
+      --formable-border: var(--formable-color-neutral-500);
+      --formable-border-hover: var(--formable-color-neutral-600);
+      --formable-border-focus: var(
+        --formable-brand,
+        var(--formable-color-accent-600)
+      );
+
+      --formable-button-primary-bg: var(
+        --formable-brand,
+        var(--formable-button-bg)
+      );
+      --formable-button-primary-bg-hover: var(--formable-color-neutral-950);
+      --formable-button-primary-text: var(--formable-button-text);
+
+      --formable-button-secondary-bg-hover: var(--formable-color-neutral-100);
+      --formable-button-ghost-bg-hover: var(--formable-color-neutral-100);
+
+      --formable-error: var(--formable-color-danger-700);
+      --formable-error-surface: var(--formable-error-bg);
+      --formable-success: var(--formable-color-success-700);
+      --formable-success-surface: var(--formable-success-bg);
+
+      --formable-track: var(--formable-color-neutral-200);
+      --formable-disabled-bg: var(--formable-color-neutral-100);
+    }
+  }
+
+  /* Reduced motion. Every transition in `formable-theme.css` reads one of
+     these two duration tokens - the button hover fill, the progress fill's
+     width - so dropping both to near-zero silences every animated state
+     change without a `transition: none` rule anywhere else. Not `0s`: a zero
+     duration skips the transition entirely in some browsers, which also
+     skips the `transitionend` event a future enhancer might reasonably wait
+     on; a near-zero one still fires it. */
+  @media (prefers-reduced-motion: reduce) {
+    :root {
+      --formable-duration-fast: 0.01ms;
+      --formable-duration-base: 0.01ms;
+    }
+  }
+}

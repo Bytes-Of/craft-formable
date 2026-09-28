@@ -1,0 +1,17 @@
+<span class="formable-select">
+    <select id="{{ inputId }}"
+        name="{{ inputName }}"
+        class="formable-input formable-input--select"
+        {%- if field.required %} required{% endif %}
+        {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+        {% if field.placeholder %}
+            <option value="">{{ field.placeholder }}</option>
+        {% endif %}
+        {% for option in field.options %}
+            <option value="{{ option.value }}"
+                {%- if option.value == (value ?? field.defaultValue) %} selected{% endif %}
+                {%- if option.isDisabled %} disabled{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+    </select>
+</span>

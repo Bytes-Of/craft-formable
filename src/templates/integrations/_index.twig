@@ -1,0 +1,104 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Integrations'|t('formable') %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+] %}
+
+{% set categoryLabels = {
+    emailMarketing: 'Email marketing'|t('formable'),
+    crm: 'CRM'|t('formable'),
+    webhook: 'Webhooks'|t('formable'),
+    miscellaneous: 'Miscellaneous'|t('formable'),
+} %}
+
+{% block actionButton %}
+    <div class="btngroup">
+        <div class="btn submit menubtn add icon">{{ 'New integration'|t('formable') }}</div>
+        <div class="menu">
+            <ul>
+                {% for type in types %}
+                    <li>
+                        <a href="{{ cpUrl('formable/integrations/new/' ~ type.type) }}">
+                            {{ type.name }}
+                            <span class="light"> - {{ categoryLabels[type.category] ?? type.category }}</span>
+                        </a>
+                    </li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+{% endblock %}
+
+{% block content %}
+    {% if not isPro %}
+        {% import 'formable/_includes/upgradeBadge' as upgrade %}
+        {{ upgrade.styles() }}
+        {{ upgrade.prompt('Integrations'|t('formable')) }}
+        <p class="light">
+            {{ 'Set your connections up now - forms will forward to them the moment you upgrade to Pro.'|t('formable') }}
+        </p>
+    {% endif %}
+
+    {% if integrations is empty %}
+        <p class="zilch">
+            {{ 'No integrations yet. Add one to forward submissions to a webhook, Slack, or a marketing or CRM tool.'|t('formable') }}
+        </p>
+    {% else %}
+        <table class="data fullwidth">
+            <thead>
+                <tr>
+                    <th scope="col">{{ 'Name'|t('formable') }}</th>
+                    <th scope="col">{{ 'Type'|t('formable') }}</th>
+                    <th scope="col">{{ 'Enabled'|t('formable') }}</th>
+                    <th scope="col" class="thin"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for integration in integrations %}
+                    <tr data-id="{{ integration.id }}">
+                        <th scope="row" data-title="{{ 'Name'|t('formable') }}">
+                            <a href="{{ cpUrl('formable/integrations/' ~ integration.id) }}">{{ integration.name }}</a>
+                            <span class="light code">{{ integration.handle }}</span>
+                        </th>
+                        <td data-title="{{ 'Type'|t('formable') }}">{{ integration.type }}</td>
+                        <td data-title="{{ 'Enabled'|t('formable') }}">
+                            {% if integration.enabled %}
+                                <span class="status green"></span>{{ 'Enabled'|t('formable') }}
+                            {% else %}
+                                <span class="status"></span>{{ 'Disabled'|t('formable') }}
+                            {% endif %}
+                        </td>
+                        <td class="thin">
+                            <button
+                                type="button"
+                                class="delete icon formable-delete-integration"
+                                title="{{ 'Delete'|t('formable') }}"
+                                data-id="{{ integration.id }}"
+                            ></button>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    {% endif %}
+{% endblock %}
+
+{% js %}
+document.querySelectorAll('.formable-delete-integration').forEach(function (button) {
+    button.addEventListener('click', function () {
+        if (!confirm({{ 'Delete this integration? Forms using it will stop forwarding to it.'|t('formable')|json_encode|raw }})) {
+            return;
+        }
+
+        Craft.sendActionRequest('POST', 'formable/integrations/delete', {
+            data: { id: button.dataset.id },
+        }).then(function () {
+            button.closest('tr').remove();
+        }).catch(function () {
+            Craft.cp.displayError();
+        });
+    });
+});
+{% endjs %}

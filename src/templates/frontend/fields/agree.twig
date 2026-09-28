@@ -1,0 +1,16 @@
+{# The consent statement is the accessible name, so it lives in the label
+ # rather than being a sibling of the checkbox. #}
+<div class="formable-option formable-option--agree">
+    <input type="checkbox"
+        id="{{ inputId }}"
+        name="{{ inputName }}"
+        value="1"
+        class="formable-input formable-input--checkbox"
+        {%- if (value ?? field.defaultValue) %} checked{% endif %}
+        {%- if field.required %} required{% endif %}
+        {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+    <label class="formable-option__label" for="{{ inputId }}">
+        {%- if field.description %}{{ field.description|purify }}{% else %}{{ field.label }}{% endif -%}
+    </label>
+</div>

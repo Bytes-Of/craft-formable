@@ -1,0 +1,12 @@
+<input type="{{ field.inputType|default('text') }}"
+    id="{{ inputId }}"
+    name="{{ inputName }}"
+    class="formable-input formable-input--text"
+    value="{{ value ?? field.defaultValue }}"
+    dir="auto"
+    {%- if field.placeholder %} placeholder="{{ field.placeholder }}"{% endif %}
+    {%- if field.limit %} maxlength="{{ field.limit }}"{% endif %}
+    {%- if field.autocomplete %} autocomplete="{{ field.autocomplete }}"{% endif %}
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>

@@ -1,0 +1,107 @@
+/**
+ * Formable hardening - a structural normalize against host CSS, deliberately
+ * outside every `@layer`.
+ *
+ * Cascade layers only settle precedence *among* layered declarations - an
+ * unlayered rule in the host's own stylesheet beats anything in
+ * `formable.tokens` / `formable.reset` / `formable.theme` / `formable.contract`
+ * regardless of specificity or load order (`docs/theming.md` "How overriding
+ * works"). That is the documented, desirable escape hatch for a site that
+ * wants to restyle Formable - but it also means an *incidental* unlayered
+ * reset a host ships for its own markup (Tailwind Preflight, Bootstrap Reboot,
+ * Tailwind Typography's `.prose`) reaches straight through every Formable
+ * layer and wins by accident, with nothing here to fight it.
+ *
+ * This file is the fix: every rule below sits outside any layer too, so it
+ * competes with a host reset on equal footing, and wins the way any two
+ * unlayered rules do - by specificity. Each selector repeats its own class
+ * (`.formable-progress__steps.formable-progress__steps`) to reach a
+ * documented (0,2,0) - enough to beat a bare element or attribute selector
+ * (0,0,1), or a one-class host scope like `.prose :where(p)` (0,1,0), without
+ * requiring `!important` or reaching for a selector a deliberate site override
+ * would have to fight blindly. A site that wants to restyle one of these
+ * elements can still win outright - override the `--formable-*` token the
+ * rule reads (a custom-property declaration follows the normal cascade, so
+ * the value updates here too, layer or no layer), or match this same (0,2,0)
+ * specificity for a plain selector override. See `internal/decisions/0069`.
+ *
+ * Deliberately narrow: every property here is a browser-default artifact or a
+ * structural sizing hazard, never colour, and every element it targets is
+ * already styled this way at every theme level `formable-reset.css` covers
+ * (or, for the fieldset `min-width` and the file-field icon/thumbnail sizing,
+ * is a gap no level has ever closed). A form's border colour, background
+ * fill, text colour and rhythm - anything only `formable-theme.css` paints,
+ * such as the control border/background restoration or the heading and error-
+ * list margins - stays out of this file on purpose and gets its own unlayered
+ * counterpart inside `formable-theme.css` instead, precisely because this file
+ * ships at every theme level, including `contract`, which promises no paint at
+ * all (see its own header comment). See `internal/decisions/0069`.
+ */
+
+/* ------------------------------------------------------------ plugin lists */
+
+/* `.formable-progress__steps` (an `<ol>`) and `.formable-multiselect__listbox`
+   (a `<ul>`) are grouping semantics, not enumerated content - a host rule as
+   ordinary as `ul, ol { padding-left: 2rem }` (Bootstrap Reboot) or one that
+   explicitly restores default markers indents the stepper or the popup
+   without either ever showing on a themed form. Both are already zeroed this
+   way in `formable-reset.css`; restating the same values here is what makes
+   it stick against an unlayered host rule. */
+.formable-progress__steps.formable-progress__steps {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.formable-multiselect__listbox.formable-multiselect__listbox {
+  margin: 0;
+  padding: var(--formable-space-1);
+  list-style: none;
+}
+
+/* ------------------------------------------------------------------ legend */
+
+/* Bootstrap Reboot floats every `<legend>` and forces it full width - a
+   layout opinion aimed at its own unstyled fieldsets that collides with
+   `_field.twig`'s flex fieldset the moment Reboot loads unlayered. */
+.formable-field__legend.formable-field__legend {
+  float: none;
+  width: auto;
+}
+
+/* ----------------------------------------------------------------- fieldset */
+
+/* `border`/`margin`/`padding` restate `formable-reset.css`'s own zeroing
+   against a host `fieldset { border: … }` rule; `min-width: 0` is not a host
+   fix at all - it is `<fieldset>`'s own `min-inline-size: min-content` UA
+   default, which every current engine ships and no reset here has ever
+   countered, so a fieldset with a long legend or wide content can overflow a
+   narrow container regardless of what the host does. */
+.formable-field__fieldset.formable-field__fieldset {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+
+/* -------------------------------------------------------------- svg / img */
+
+/* File-field icon and thumbnail sizing. These enhancers run at every theme
+   level - JavaScript enhancement isn't gated by `themeLevel` - so a bare
+   `contract` install still needs its dropzone icon and upload thumbnail sized
+   sanely, on top of surviving a host `img, svg { … }` reset. */
+.formable-file__icon.formable-file__icon {
+  width: var(--formable-space-6);
+  height: var(--formable-space-6);
+}
+
+.formable-field__file-thumb.formable-field__file-thumb {
+  width: var(--formable-control-height);
+  height: var(--formable-control-height);
+  object-fit: cover;
+}
+
+.formable-field__file-thumb--icon.formable-field__file-thumb--icon svg {
+  width: var(--formable-space-5);
+  height: var(--formable-space-5);
+}

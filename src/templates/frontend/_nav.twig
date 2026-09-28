@@ -1,0 +1,78 @@
+{#
+ # The navigation for the current step: back, next/submit, and the optional
+ # save-and-resume control.
+ #
+ # Each button names the step it triggers through `formableStep`, so the
+ # non-JS path works with nothing but standard multi-submit-button behaviour -
+ # the server reads which button was pressed. The AJAX layer keys off the same
+ # attribute.
+ #
+ # Variables:
+ #   form         the Form these settings belong to
+ #   settings     FormSettings, already localized to the current site
+ #                ({@see \bytesof\formable\services\Translations::localizeSettings()})
+ #   isMultiPage  whether the form has more than one page
+ #   isReview     whether the current step is the review
+ #   isFirstStep  whether there is no earlier page to go back to
+ #   isLastPage   whether the current page is the last in the sequence
+ #   showReview   whether a review step follows the last page
+ #   formId       this render's unique form id (see `form.twig`) - namespaces
+ #                the resume-email input's id so two renders of the same form
+ #                on one page don't mint the same `id`/`<label for>` pair
+ #}
+{% set isFinalStep = isReview or (isLastPage and not showReview) %}
+{% set formId = formId ?? 'formable' %}
+{% set resumeEmailId = "#{formId}-resume-email" %}
+
+<div class="formable-form__actions" data-formable-actions>
+    {% if isMultiPage and not isFirstStep %}
+        <button type="submit"
+            class="formable-button formable-button--secondary formable-button--back"
+            name="formableStep"
+            value="back"
+            formnovalidate
+            data-formable-back>
+            <span class="formable-button__label">{{ settings.backButtonLabel }}</span>
+        </button>
+    {% endif %}
+
+    {% if isFinalStep %}
+        <button type="submit"
+            class="formable-button formable-button--primary formable-button--submit{{ isMultiPage ? '' : ' formable-button--lg' }}"
+            name="formableStep"
+            value="submit"
+            data-formable-submit>
+            <span class="formable-button__label">{{ settings.submitButtonLabel }}</span>
+        </button>
+    {% else %}
+        <button type="submit"
+            class="formable-button formable-button--primary formable-button--next"
+            name="formableStep"
+            value="next"
+            data-formable-next>
+            <span class="formable-button__label">{{ settings.nextButtonLabel }}</span>
+        </button>
+    {% endif %}
+
+    {% if settings.enableSaveAndResume and craft.formable.isPro and not isReview %}
+        <div class="formable-save" data-formable-save>
+            <label class="formable-save__label" for="{{ resumeEmailId }}">
+                {{ 'Email to send a resume link to'|t('formable') }}
+            </label>
+            <input type="email"
+                class="formable-input formable-save__email"
+                id="{{ resumeEmailId }}"
+                name="formableResumeEmail"
+                autocomplete="email"
+                data-formable-resume-email>
+            <button type="submit"
+                class="formable-button formable-button--secondary formable-button--save"
+                name="formableStep"
+                value="save"
+                formnovalidate
+                data-formable-save-button>
+                <span class="formable-button__label">{{ settings.saveAndResumeLabel }}</span>
+            </button>
+        </div>
+    {% endif %}
+</div>

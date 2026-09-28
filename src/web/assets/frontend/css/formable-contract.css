@@ -1,0 +1,121 @@
+/**
+ * Formable contract - the accessibility contract alone, no layout, no paint.
+ *
+ * The `.formable-visually-hidden` utility, `[hidden]`/`.formable-field--hidden`
+ * state, and the structural shape of the focus ring - width, offset, style,
+ * deliberately no colour. Nothing here assumes flex/grid layout or reads a
+ * `--formable-space-*` gap, so a headless or Tailwind site can load this file
+ * alone and get the a11y contract without inheriting a single layout opinion.
+ *
+ * `formable-reset.css` is this file plus layout; `formable-theme.css` is reset
+ * plus paint. The three sit in the `formable.reset` / `formable.theme` /
+ * `formable.contract` cascade layers, in that precedence order - declared in
+ * `formable-tokens.css`, loaded first. `formable.contract` is deliberately
+ * last: layer order is precedence order, so these rules win over any layout or
+ * paint declaration on the same element without a specificity fight, and reset
+ * never has to re-state a `[hidden]` rule to survive its own `display`
+ * repaint.
+ *
+ * The visually-hidden and hidden-state declarations below carry `!important`.
+ * Layered `!important` outranks *every* unlayered author declaration,
+ * important or not - the one case where layer order alone (see
+ * `internal/decisions/0059`) isn't enough, because an unlayered host rule
+ * beats a layered normal declaration regardless of specificity. Without
+ * `!important` here, a host rule as ordinary as `label { position: relative }`
+ * silently defeats `.formable-visually-hidden`. The focus-ring shape below
+ * stays plain `!important`-free: no finding shows a host rule defeating it,
+ * and its colour (`formable-theme.css`) is unaffected either way. See
+ * `internal/decisions/0069`.
+ */
+
+@layer formable.contract {
+  /* Available to a screen reader, invisible on screen. The rendered markup uses
+     it for names that would be redundant to sighted people - a table cell's
+     "Email, row 2" - so this rule is one of the few here that isn't optional:
+     without it those labels show up as visible clutter. `!important` per the
+     file header - an unlayered host rule setting `position`, `clip-path` or
+     `white-space` on the same element would otherwise win outright. */
+  .formable-visually-hidden {
+    position: absolute !important;
+    width: 1px !important;
+    height: 1px !important;
+    margin: -1px !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+    clip-path: inset(50%) !important;
+    white-space: nowrap !important;
+    border: 0 !important;
+  }
+
+  /* A field hidden by conditional logic, and the native `hidden` attribute in
+     general. `formable.contract` is the last layer, so this beats reset's
+     `.formable-field { display: flex }` and theme's paint on the same element
+     with no re-assertion needed anywhere downstream; `!important` per the file
+     header additionally beats an unlayered host rule.
+     `[hidden]` is scoped to Formable's own subtree - the form and the
+     outside-form surfaces the success/closed/resume templates render - rather
+     than the bare, page-wide attribute selector this used to be. Unscoped, it
+     silently broke `hidden="until-found"` find-in-page anywhere else on the
+     host page, on every install now that `contract` is the floor (0062). The
+     `:not([hidden='until-found'])` exclusion mirrors the browser's own UA
+     stylesheet rule for the same attribute, as defence in depth should a
+     future field ever use that value inside Formable's own markup. */
+  .formable-field--hidden,
+  :is(
+      .formable-form,
+      .formable-success,
+      .formable-closed,
+      .formable-resume-page
+    )
+    [hidden]:not([hidden='until-found']) {
+    display: none !important;
+  }
+
+  /* Width, offset and style only - no colour, so a contract-only site keeps a
+     visible keyboard focus indicator (outline-color's initial value is
+     `currentcolor`) without a plugin declaration dictating its colour.
+     `formable-theme.css` adds `outline-color`; because this layer now wins the
+     shape outright, the button's wider ring comes from theme overriding
+     `--formable-focus-ring-offset` on the button rather than restating
+     `outline-offset` here. */
+  .formable-input:focus-visible,
+  .formable-button:focus-visible,
+  .formable-signature__typed:focus-visible {
+    outline-style: solid;
+    outline-width: var(--formable-focus-ring-width);
+    outline-offset: var(--formable-focus-ring-offset);
+  }
+
+  /* Checkbox/radio inputs stay native (~13px, browser-drawn), so a ring on the
+     input itself would land on that tiny box instead of the enlarged
+     `.formable-option` row it sits in (padding for that row is layout, and
+     lives in reset). Suppress it there and ring the row instead. */
+  .formable-option .formable-input:focus-visible {
+    outline: none;
+  }
+
+  .formable-option:has(.formable-input:focus-visible) {
+    outline-style: solid;
+    outline-width: var(--formable-focus-ring-width);
+    outline-offset: var(--formable-focus-ring-offset);
+  }
+
+  /* `:has()` reached engines later than `:focus-within` did (Safari 15.4,
+     Firefox 121) - without a fallback, a browser old enough to miss it still
+     runs the suppression two rules up but never gets the replacement ring
+     above, leaving no visible focus indicator on the row at all.
+     `:focus-within` matches the same focused-descendant condition and has
+     been supported for years longer, so it stands in as the ring source on
+     that older-browser path - at the cost of also matching a plain mouse
+     focus there, which a modern `:has()` browser never falls back to. The
+     dropzone and multi-select control get the same fallback; see
+     `formable-reset.css` and `formable-theme.css`.
+     See [[frontend-embeddability-review]] chunk 10 (L1). */
+  @supports not selector(:has(*)) {
+    .formable-option:focus-within {
+      outline-style: solid;
+      outline-width: var(--formable-focus-ring-width);
+      outline-offset: var(--formable-focus-ring-offset);
+    }
+  }
+}

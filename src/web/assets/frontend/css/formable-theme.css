@@ -1,0 +1,1601 @@
+/**
+ * Formable theme - everything the rendered form paints with.
+ *
+ * On by default, at theme level `default`. A rendered form is what a buyer
+ * judges the plugin by, and an unstyled one reads as broken - so a site opts
+ * out with theme level `contract` rather than opting in. It also stays a starting
+ * point for authors who'd rather tweak than begin from nothing.
+ *
+ * Layout, the a11y contract, `[hidden]`/state-hook behaviour and the
+ * structural shape of the focus ring live in `formable-reset.css` instead -
+ * this file adds colour, typography and radius on top of it and depends on
+ * it for layout, so the two load together. Values live in
+ * `formable-tokens.css` as `--formable-*` custom properties declared on
+ * `:root`; a site restyles the whole thing by overriding a handful of those,
+ * from `:root`, a wrapper of its own, or the form itself, rather than
+ * fighting these selectors (`internal/decisions/0070`). Every rule here sits
+ * in the `formable.theme` cascade layer - order declared in
+ * `formable-tokens.css` - so any unlayered site rule wins without
+ * `!important`.
+ *
+ * Every rule below reads the component tier - `--formable-input-bg`,
+ * `--formable-progress-step-bg` and the like - never a semantic token
+ * (`--formable-surface`, `--formable-border`, …) directly. That's what lets a
+ * site retint one component, the inputs say, without also moving the
+ * progress step circle or the table's scroll-shadow fade, which used to
+ * share the same semantic token for no reason beyond coincidence. See
+ * `internal/decisions/0047`.
+ */
+
+@layer formable.theme {
+  /* `color-scheme` opts native chrome - checkbox/radio ticks, the select
+     listbox, scrollbars inside the signature canvas - into the visitor's own
+     light/dark preference, on top of the palette swap below. Declared here
+     rather than in the reset: it's a colour opinion like everything else in
+     this file, so a reset-only site (no colour at all) doesn't get it
+     either. */
+  .formable-form {
+    color: var(--formable-text);
+    color-scheme: light dark;
+  }
+
+  /* A forced `data-formable-scheme` (`formable-tokens.css`) pins the palette;
+     this pins native chrome - the date picker, the `accent-color` checkbox -
+     to match, same as the plain `light dark` above follows the OS otherwise.
+     Unlike the tokens themselves, `.formable-form`'s own `color-scheme: light
+     dark` above is a literal value, not a `var()` reference, so it always
+     shadows whatever an ancestor sets - there's no late-bound resolution to
+     rely on here. The descendant clause is what compensates: a bare
+     `[data-formable-scheme]` reaches an ancestor carrying the attribute (any
+     element, generalised by `internal/decisions/0070`) directly, and the
+     second clause restates the same value on a `.formable-form` underneath
+     it, unless that form opts the other way itself - which the first clause
+     already matches directly, since a plain attribute selector catches the
+     form the same as any other element. */
+  [data-formable-scheme='light'],
+  [data-formable-scheme='light']
+    .formable-form:not([data-formable-scheme='dark']) {
+    color-scheme: light;
+  }
+
+  [data-formable-scheme='dark'],
+  [data-formable-scheme='dark']
+    .formable-form:not([data-formable-scheme='light']) {
+    color-scheme: dark;
+  }
+
+  /* `auto` (`Settings::$colorScheme`) is the one resolved value that doesn't
+     pin a scheme - it follows `prefers-color-scheme`, or an ancestor forcing
+     one, the same as every form did before this setting existed. Because
+     that source is outside the plugin's control, an `auto` form paints its
+     own background rather than assuming a host page's actual background
+     moves with it - it stays legible on any page regardless of what the
+     visitor's OS or a forcing ancestor happens to prefer, including the case
+     `internal/decisions/0071` exists to close: a dark OS preference on an
+     otherwise light, unstyled host page. `light`/`dark` don't get this -
+     pinning a scheme is a deliberate, informed choice about where the form
+     sits, so the site already owns the background around it. */
+  .formable-form[data-formable-scheme='auto'] {
+    background-color: var(--formable-surface);
+  }
+
+  /* ------------------------------------------------------------------ layout */
+
+  /* The step title - always an `<h2>` (`_page.twig`). `-2xl` and an explicit
+     weight put it two rungs and a clear step above `.formable-heading` below;
+     the tight leading keeps a wrapped title from opening up at the host's body
+     line-height. See `internal/decisions/0058`. */
+  .formable-page__label {
+    margin: 0;
+    font-size: var(--formable-font-size-2xl);
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-tight);
+  }
+
+  .formable-field__label,
+  .formable-field__legend {
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-normal);
+    padding: 0;
+  }
+
+  /* A sub-input's label inside a composite field (`fields/_subFields.twig`).
+     Subordinate to the fieldset legend that names the group, so lighter and
+     smaller than a top-level field label. */
+  .formable-subfield__label {
+    font-weight: var(--formable-font-weight-medium);
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* The Email field's "Confirm email" label (`fields/email.twig`) - a second
+     label inside one field wrapper. A little air so the confirmation pair
+     reads as its own row rather than crowding the address above it. */
+  .formable-field__label--confirm {
+    margin-block-start: var(--formable-space-3);
+  }
+
+  /* Neutral, not error-coloured - decisions/0039. */
+  .formable-field__required {
+    color: var(--formable-field-required-text, var(--formable-text-muted));
+  }
+
+  .formable-field__instructions,
+  .formable-field__hint {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+    line-height: var(--formable-line-height-normal);
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+
+  /* Heading (`heading.twig`) exists only to provide visual structure, so it's
+     one of the few places the theme has to paint something rather than defer
+     to the site. The author picks the element (`<h1>`-`<h6>`); the theme
+     flattens every level to one size, weight and leading so the choice stays
+     semantic. Two rungs below `.formable-page__label` (1.5rem) and at the
+     system's own weight ceiling rather than the browser's bolder heading
+     default, so a heading inside a page reads as subordinate to the step
+     title. See `internal/decisions/0058`. */
+  .formable-heading {
+    margin: 0;
+    font-size: var(--formable-font-size-lg);
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-tight);
+  }
+
+  /* The card `.formable-group` wraps in the reset layer - the grouping
+     primitive itself (1.11). Same shape as `.formable-review__page` below,
+     deliberately: both are "a bordered chunk of the form" and should look
+     like the same idea. */
+  .formable-group {
+    padding: var(--formable-space-5);
+    border: var(--formable-border-width) solid
+      var(--formable-group-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  /* The bordered/boxed variant (2.5/5.5) - `FormSettings::$appearance`
+     (Wave 4) will emit `formable-form--bordered` on the wrapper. Same card
+     recipe as `.formable-group` above, deliberately: it's "a bordered chunk
+     of the form" applied to the form's own outer edge instead of a run of
+     rows inside it, so it reads as the same idea and shares its token. */
+  .formable-form--bordered {
+    padding: var(--formable-space-5);
+    border: var(--formable-border-width) solid
+      var(--formable-group-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  /* Only reached when a Section field shares a row with another field - the
+     builder never offers that, but validation doesn't reject it either, so
+     the fallback stays: a plain rule, since there's no group to wrap here. */
+  .formable-section-divider {
+    margin: 0;
+    border: 0;
+    border-block-start: var(--formable-border-width) solid
+      var(--formable-group-border, var(--formable-border));
+  }
+
+  /* The Html field (`fields/html.twig`) drops in author-authored rich text. The
+     form owns the rhythm around it, so trim the leading and trailing block's
+     own margin rather than letting it stack with the field gap. */
+  .formable-html > :first-child {
+    margin-block-start: 0;
+  }
+
+  .formable-html > :last-child {
+    margin-block-end: 0;
+  }
+
+  /* ------------------------------------------------------------------ inputs */
+
+  .formable-input {
+    padding: var(--formable-control-padding-y) var(--formable-control-padding-x);
+    font: inherit;
+    color: var(--formable-input-text, var(--formable-text));
+    background-color: var(--formable-input-bg, var(--formable-surface));
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  /* iOS Safari zooms the whole viewport to fit any focused text control whose
+     computed font-size is under 16px - `font: inherit` above means a host
+     page's own smaller base size is exactly how a plugin control ends up
+     there. `max()` only ever raises it, so a host already at 16px or above
+     is untouched. Checkbox/radio have no text to size and the file input
+     shows its native button, not a caret, so both stay out; the
+     multi-select's search box isn't `.formable-input` at all and gets the
+     same rule directly. See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (pointer: coarse) {
+    .formable-input:not(
+      .formable-input--checkbox,
+      .formable-input--radio,
+      .formable-input--file
+    ),
+    .formable-multiselect__search {
+      font-size: max(1em, 16px);
+    }
+  }
+
+  /* Colour only - width, offset and style come from the reset's tokenless
+     ring shape, so a reset-only site keeps a visible ring even without this
+     rule. */
+  .formable-input:focus-visible {
+    outline-color: var(--formable-focus-ring-color);
+  }
+
+  /* A touch pointer has no hover state to paint - without this gate the
+     border-hover colour sticks after a tap on some touchscreens, until the
+     visitor taps elsewhere. Every other `:hover` rule in this file gets the
+     same gate. See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-input:hover:not([disabled], [readonly]) {
+      border-color: var(
+        --formable-input-border-hover,
+        var(--formable-border-hover)
+      );
+    }
+  }
+
+  .formable-input::placeholder {
+    color: var(--formable-input-placeholder, var(--formable-text-muted));
+  }
+
+  /* Browser defaults for disabled and readonly controls diverge sharply across
+     engines, and Formable leans on `disabled` more than most: conditional logic
+     disables hidden fields (`conditions-dom.ts`) and `checkboxes.twig` can emit
+     `disabled` on individual options. Give both states one consistent look. */
+  .formable-input[disabled],
+  .formable-input[readonly] {
+    background-color: var(
+      --formable-input-bg-disabled,
+      var(--formable-disabled-bg)
+    );
+    color: var(--formable-input-text-disabled, var(--formable-text-muted));
+    cursor: not-allowed;
+  }
+
+  .formable-input[readonly] {
+    cursor: default;
+  }
+
+  .formable-option:has(.formable-input[disabled]) .formable-option__label {
+    color: var(--formable-option-text-disabled, var(--formable-text-muted));
+    cursor: not-allowed;
+  }
+
+  .formable-input[aria-invalid='true'] {
+    border-color: var(--formable-input-border-invalid, var(--formable-error));
+  }
+
+  /* Forced colours (Windows High Contrast and similar) snap every border to
+     one of a handful of system colours, so an invalid field's red border can
+     land on the same colour as a healthy field's - the one signal 0040 left
+     on the input disappears. `border-style` isn't part of that remapping, so
+     a dashed border stays visible as a second signal regardless of which
+     colour the browser substitutes for `--formable-input-border-invalid`. */
+  @media (forced-colors: active) {
+    .formable-input[aria-invalid='true'] {
+      border-style: dashed;
+    }
+  }
+
+  .formable-option__label {
+    font-weight: var(--formable-font-weight-normal);
+  }
+
+  /* Sizing (the reset's `inline-size: auto`) and colour used to have to be
+     re-declared together here - see [[frontend-embeddability-review]] chunk 9
+     (M5) for why sizing moved out. `accent-color` reads `--formable-text`,
+     not `--formable-button-bg`: the button is achromatic and inverts per
+     colour scheme (`internal/decisions/0045`), and a checked box painted the
+     *light*-mode button colour would render near-black on the near-black
+     dark-mode surface. `--formable-text` already inverts with the scheme, so
+     the check stays legible either way. */
+  .formable-input--checkbox,
+  .formable-input--radio {
+    accent-color: var(--formable-input-accent, var(--formable-text));
+  }
+
+  /* Paints the padded hit area the reset carves out on `.formable-option` -
+     without this the enlarged row is clickable but gives no visual feedback.
+     Gated behind `(hover: hover)` - see
+     [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-option:hover:not(:has(.formable-input[disabled])) {
+      background-color: var(
+        --formable-option-bg-hover,
+        var(--formable-surface-raised)
+      );
+      border-radius: var(--formable-radius);
+    }
+  }
+
+  /* Colour and shape for the row-level ring the reset's
+     `.formable-option:has(.formable-input:focus-visible)` carves out -
+     `border-radius` matches the hover treatment above so the two states read
+     as the same shape. */
+  .formable-option:has(.formable-input:focus-visible) {
+    outline-color: var(--formable-focus-ring-color);
+    border-radius: var(--formable-radius);
+  }
+
+  /* Colour for the `:focus-within` fallback shape in `formable-contract.css`
+     - see [[frontend-embeddability-review]] chunk 10 (L1). */
+  @supports not selector(:has(*)) {
+    .formable-option:focus-within {
+      outline-color: var(--formable-focus-ring-color);
+      border-radius: var(--formable-radius);
+    }
+  }
+
+  .formable-option:has(.formable-input:checked) .formable-option__label {
+    font-weight: var(--formable-font-weight-semibold);
+  }
+
+  /* `appearance: none` drops the native chrome, caret included; the box then
+     lines up with a text input because both are `border-box` with the same
+     `min-height` from the reset. The caret itself is redrawn on the
+     `.formable-select` wrapper below, not here: a `<select>` takes no
+     `::after`, so the glyph can't be masked directly onto it. */
+  .formable-input--select {
+    padding-inline-end: calc(var(--formable-control-padding-x) + 1.5em);
+    appearance: none;
+  }
+
+  /* The select's caret. A `<select>` takes no `::after`, so `dropdown.twig`
+     wraps it in this span and the caret is masked onto the wrapper's
+     pseudo-element instead of painted as a `background-image` - a mask reads
+     `background-color`, so the glyph follows `--formable-text-muted` (and so
+     dark mode, and a rebrand) the same way the progress indicator's done-tick
+     does, with no per-scheme copy of the SVG required. `pointer-events: none`
+     keeps the overlaid glyph from stealing the click that opens the list. */
+  .formable-select {
+    position: relative;
+  }
+
+  .formable-select::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-end: var(--formable-control-padding-x);
+    width: 1em;
+    height: 1em;
+    transform: translateY(-50%);
+    background-color: var(
+      --formable-select-chevron-color,
+      var(--formable-text-muted)
+    );
+    mask: var(--formable-select-chevron) center / contain no-repeat;
+    pointer-events: none;
+  }
+
+  /* A `background-color` read through a `mask` isn't guaranteed to survive
+     forced colours the way a plain background does - the same reason the
+     progress indicator's done-tick drops its own mask below, rather than
+     gambling on it. `appearance: auto` hands the whole control back to the
+     browser's own combobox chrome instead, which forced colours always
+     renders correctly; the decorative caret is dropped so it can't double up
+     on the native one, and the padding it was reserving room for goes with
+     it. See [[frontend-embeddability-review]] chunk 10 (L5). */
+  @media (forced-colors: active) {
+    .formable-input--select {
+      padding-inline-end: var(--formable-control-padding-x);
+      appearance: auto;
+    }
+
+    .formable-select::after {
+      content: none;
+    }
+  }
+
+  /* Chrome and Safari draw date/time inputs (`internal/decisions/0031`) with
+     the same native menulist-button chrome as an un-reset `<select>`, which
+     draws to the OS's own control height regardless of this file's padding
+     and `min-height` - the identical problem `.formable-input--select`
+     fixes above, and for the same reason. `appearance` needs no `-moz-`
+     prefix in any Firefox version this plugin supports, and Firefox never
+     painted that menulist-button chrome on date/time inputs to begin with -
+     this rule is a no-op there either way, and doesn't touch Firefox's own
+     calendar/clock icon, which isn't appearance-driven. */
+  .formable-input--date {
+    appearance: none;
+  }
+
+  /* The calendar/clock glyph is a separate shadow element carrying its own
+     default padding - the actual source of the extra height, since the
+     host's `appearance: none` above only drops the surrounding chrome. `1em`
+     matches the select's caret above so a native and a masked icon read as
+     the same size next to each other. */
+  .formable-input--date::-webkit-calendar-picker-indicator {
+    width: 1em;
+    height: 1em;
+    padding: 0;
+    margin-inline-start: var(--formable-space-2);
+    cursor: pointer;
+  }
+
+  /* The un-enhanced state: no JavaScript, or too few options for
+     `multi-select.ts` to bother enhancing (see its header comment). A
+     `size`-rowed multi-select renders as a listbox, not a popup, so it gets no
+     caret and no fixed height - `size` already drives that natively. Only the
+     native listbox chrome and per-option breathing room were missing. Once
+     enhanced, the select carrying these classes is hidden and the rules below
+     paint the combobox that replaces it instead. */
+  .formable-input--multiselect {
+    padding: var(--formable-space-2);
+    appearance: none;
+  }
+
+  .formable-input--multiselect option {
+    padding: var(--formable-space-1) var(--formable-space-2);
+    border-radius: var(--formable-radius);
+  }
+
+  .formable-input--multiselect option:checked {
+    background-color: var(
+      --formable-option-bg-hover,
+      var(--formable-surface-raised)
+    );
+  }
+
+  /* The enhanced control: a chip row and a search box standing in for the
+     hidden `<select>`, styled to read as the same kind of box as
+     `.formable-input` without actually being one - a `<div>` has no `[disabled]`
+     or `[readonly]` state to share those rules with, and the two controls
+     paint different things regardless (a listbox's rows here, a text input's
+     placeholder there). */
+  .formable-multiselect__control {
+    color: var(--formable-input-text, var(--formable-text));
+    background-color: var(--formable-input-bg, var(--formable-surface));
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-multiselect__control:hover {
+      border-color: var(
+        --formable-input-border-hover,
+        var(--formable-border-hover)
+      );
+    }
+  }
+
+  .formable-multiselect__control:has(:focus-visible) {
+    outline-color: var(--formable-focus-ring-color);
+  }
+
+  /* Colour for the `:focus-within` fallback shape in `formable-reset.css` -
+     see [[frontend-embeddability-review]] chunk 10 (L1). */
+  @supports not selector(:has(*)) {
+    .formable-multiselect__control:focus-within {
+      outline-color: var(--formable-focus-ring-color);
+    }
+  }
+
+  .formable-multiselect__control[aria-invalid='true'] {
+    border-color: var(--formable-input-border-invalid, var(--formable-error));
+  }
+
+  .formable-multiselect__chip {
+    background-color: var(
+      --formable-multiselect-chip-bg,
+      var(--formable-surface-raised)
+    );
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius-sm);
+    font-size: var(--formable-font-size-sm);
+  }
+
+  .formable-multiselect__chip-remove {
+    color: var(--formable-multiselect-chip-remove, var(--formable-text-muted));
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-multiselect__chip-remove:hover {
+      color: var(
+        --formable-multiselect-chip-remove-hover,
+        var(--formable-text)
+      );
+    }
+  }
+
+  .formable-multiselect__search {
+    color: var(--formable-input-text, var(--formable-text));
+  }
+
+  .formable-multiselect__search::placeholder {
+    color: var(--formable-input-placeholder, var(--formable-text-muted));
+  }
+
+  /* Elevated off the page it floats over - the first rule in the sheet to
+     reach for `--formable-shadow-md`, declared since Wave 4 and unused until
+     now (2.7). */
+  .formable-multiselect__listbox {
+    background-color: var(--formable-input-bg, var(--formable-surface));
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+    box-shadow: var(--formable-shadow-md);
+  }
+
+  /* `--active` is `multi-select.ts`'s keyboard-highlight class, not a hover
+     state - it stays unconditional so arrow-key navigation still paints a
+     highlight on a touch device with no hover at all. Only the `:hover`
+     half needs the gate. See [[frontend-embeddability-review]] chunk 10
+     (L2). */
+  .formable-multiselect__option--active {
+    background-color: var(
+      --formable-option-bg-hover,
+      var(--formable-surface-raised)
+    );
+  }
+
+  @media (hover: hover) {
+    .formable-multiselect__option--selectable:hover {
+      background-color: var(
+        --formable-option-bg-hover,
+        var(--formable-surface-raised)
+      );
+    }
+  }
+
+  .formable-multiselect__option--selected {
+    font-weight: var(--formable-font-weight-semibold);
+  }
+
+  .formable-multiselect__option--disabled {
+    color: var(--formable-option-text-disabled, var(--formable-text-muted));
+  }
+
+  .formable-multiselect__empty {
+    color: var(--formable-multiselect-empty-text, var(--formable-text-muted));
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* -------------------------------------------------------- messages & state */
+
+  /* A failing field's two signals: the invalid control's border (painted by
+     `[aria-invalid='true']` above, wherever the field's control lands) and
+     this message, which carries the actual "why" - reached via the control's
+     `aria-describedby` and, on submit, the focused error summary above it,
+     not a `role="alert"` of its own (decisions/0064).
+     `.formable-field--error` itself paints nothing - decisions/0040 dropped
+     the gutter accent and the red label/legend that used to stack on top of
+     the border, since neither the field's position nor its name is itself
+     the error. */
+  .formable-field__errors,
+  .formable-form__errors {
+    color: var(--formable-message-error-text, var(--formable-error));
+  }
+
+  .formable-form__errors {
+    margin: 0;
+    padding: var(--formable-space-4) var(--formable-space-5);
+    background-color: var(
+      --formable-message-error-bg,
+      var(--formable-error-surface)
+    );
+    border: var(--formable-border-width) solid currentcolor;
+    border-radius: var(--formable-radius);
+  }
+
+  .formable-form__errors-message {
+    margin: 0;
+  }
+
+  /* The route to each failing field. `form.twig` and `handleErrors()` in
+     `main.ts` both build this list from the same field data, targeting the
+     same anchor a field already carries - `id="formable-{id}"` on its input,
+     or on the `<fieldset>` for a grouped field (`_field.twig`) - so the two
+     paths render identically regardless of which one produced this render. */
+  .formable-form__errors-list {
+    margin-block: var(--formable-space-3) 0;
+    margin-inline: 0;
+    padding-inline-start: 1.125rem;
+    font-size: var(--formable-font-size-sm);
+  }
+
+  .formable-form__errors-list a {
+    color: inherit;
+    text-decoration-thickness: 1px;
+    text-underline-offset: 0.15em;
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-form__errors-list a:hover {
+      text-decoration-thickness: 2px;
+    }
+  }
+
+  .formable-field__error {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* The emotional peak of the interaction, so it gets real weight rather than
+     the field-error box's quieter treatment: a larger radius, roomier
+     padding, and an icon instead of relying on colour alone to read as good
+     news. The message itself is the heading - a site's `successMessage`
+     setting is already the one line of copy this state has, so there's no
+     second, generic "Success!" string to keep translated alongside it. */
+  .formable-success {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--formable-space-4);
+    margin: 0;
+    padding: var(--formable-space-6);
+    color: var(--formable-message-success-text, var(--formable-success));
+    background-color: var(
+      --formable-message-success-bg,
+      var(--formable-success-surface)
+    );
+    border: var(--formable-border-width) solid currentcolor;
+    border-radius: var(--formable-radius-lg);
+  }
+
+  .formable-success__icon {
+    flex-shrink: 0;
+    width: 1.5rem;
+    height: 1.5rem;
+
+    /* Optical alignment with the heading's cap-height rather than its full
+       line-height box. */
+    margin-block-start: 0.125rem;
+  }
+
+  /* The icon's sibling: everything textual stacks in its own column so an
+     optional details line and the restart link sit under the heading rather
+     than beside it, which is what direct flex children of `.formable-success`
+     would do. */
+  .formable-success__content {
+    display: flex;
+    flex-direction: column;
+    gap: var(--formable-space-2);
+  }
+
+  .formable-success__heading {
+    margin: 0;
+    font-size: var(--formable-font-size-lg);
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-tight);
+  }
+
+  /* Quieter than the heading on purpose - the heading is the one line of
+     news, this is the optional "what happens next" that follows it. */
+  .formable-success__details {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* Underlined rather than ringed off from the message copy by a button
+     shape - it's the same tinted box, not a separate control. */
+  .formable-success__restart {
+    align-self: flex-start;
+    color: inherit;
+    font-size: var(--formable-font-size-sm);
+    font-weight: var(--formable-font-weight-medium);
+    text-decoration: underline;
+    text-underline-offset: 0.15em;
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-success__restart:hover {
+      text-decoration-thickness: 2px;
+    }
+  }
+
+  /* Neutral, not error-toned: the form isn't wrong, it's just shut. Was
+     unstyled entirely - a bare paragraph in whatever the host page's default
+     text looked like - so this is the same message-box shape as the two
+     above with a muted rather than a semantic tint. */
+  .formable-closed {
+    margin: 0;
+    padding: var(--formable-space-4) var(--formable-space-5);
+    color: var(--formable-message-neutral-text, var(--formable-text-muted));
+    background-color: var(
+      --formable-message-neutral-bg,
+      var(--formable-surface-raised)
+    );
+    border: var(--formable-border-width) solid
+      var(--formable-message-neutral-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  /* ------------------------------------------------------------- file upload */
+
+  /* The native control inherits the text-input padding from `.formable-input`,
+     which leaves the "choose files" button crammed against the top edge; a
+     little more vertical room and a styled `::file-selector-button` make it
+     read as a file picker rather than a text box that happens to hold a
+     button. */
+  .formable-input--file {
+    padding: var(--formable-space-3) var(--formable-control-padding-x);
+    cursor: pointer;
+  }
+
+  .formable-input--file::file-selector-button {
+    margin-inline-end: var(--formable-space-3);
+    padding: var(--formable-space-1) var(--formable-space-3);
+    font: inherit;
+    font-weight: var(--formable-font-weight-semibold);
+    color: var(--formable-button-secondary-text);
+    background-color: var(--formable-button-secondary-bg);
+    border: var(--formable-border-width) solid
+      var(--formable-button-secondary-border);
+    border-radius: var(--formable-radius-sm);
+    cursor: pointer;
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-input--file::file-selector-button:hover {
+      background-color: var(--formable-button-secondary-bg-hover);
+    }
+  }
+
+  /* The dropzone the enhancer builds around the (now invisible) input - a
+     dashed border reads as "drop target" the way the solid one on
+     `.formable-group` doesn't, so the two bordered shapes stay visually
+     distinct. Unenhanced, none of this applies and the native input above
+     keeps its own `::file-selector-button` chrome. */
+  .formable-file__dropzone {
+    border: var(--formable-border-width) dashed
+      var(--formable-file-dropzone-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+    color: var(--formable-file-dropzone-icon, var(--formable-text-muted));
+    transition:
+      border-color var(--formable-duration-fast) var(--formable-ease),
+      background-color var(--formable-duration-fast) var(--formable-ease);
+  }
+
+  /* The ring lands on the decorative box, not the (invisible) input inside
+     it - same `:has()` trick the multi-select combobox option uses to ring
+     its enlarged hit area instead of the tiny native control. */
+  .formable-file__dropzone:has(.formable-input--file:focus-visible) {
+    outline: var(--formable-focus-ring-width) solid
+      var(--formable-focus-ring-color);
+    outline-offset: var(--formable-focus-ring-offset);
+  }
+
+  /* Same `:has()`-support fallback as the option row (`formable-contract.css`)
+     and the multi-select control (`formable-reset.css`) - the input's own
+     ring is invisible regardless (`opacity: 0` above), so a browser missing
+     `:has()` otherwise gets no focus indicator here at all.
+     See [[frontend-embeddability-review]] chunk 10 (L1). */
+  @supports not selector(:has(*)) {
+    .formable-file__dropzone:focus-within {
+      outline: var(--formable-focus-ring-width) solid
+        var(--formable-focus-ring-color);
+      outline-offset: var(--formable-focus-ring-offset);
+    }
+  }
+
+  /* The whole zone lights up while a file is dragged over it. */
+  .formable-file--dragover .formable-file__dropzone {
+    border-color: var(
+      --formable-file-dragover-border,
+      var(--formable-border-focus)
+    );
+    background-color: var(
+      --formable-file-dragover-bg,
+      var(--formable-surface-raised)
+    );
+  }
+
+  /* Both the resting and dragover states are just a border colour and a
+     background colour - forced colours can remap either or both to the same
+     system value, collapsing the one signal that a drop is about to land.
+     `border-style` isn't part of that remapping (the invalid input above
+     relies on the same fact), so switching dashed to solid survives
+     whatever the two colours get substituted with. See
+     [[frontend-embeddability-review]] chunk 10 (L5). */
+  @media (forced-colors: active) {
+    .formable-file--dragover .formable-file__dropzone {
+      border-style: solid;
+    }
+  }
+
+  .formable-file__prompt {
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+
+  .formable-file__notice {
+    color: var(--formable-file-notice-text, var(--formable-error));
+  }
+
+  .formable-field__notice {
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+
+  .formable-field__files {
+    font-size: var(--formable-font-size-sm);
+  }
+
+  .formable-field__file {
+    padding: var(--formable-space-2) var(--formable-space-3);
+    background-color: var(
+      --formable-file-chip-bg,
+      var(--formable-surface-raised)
+    );
+    border-radius: var(--formable-radius-sm);
+  }
+
+  .formable-field__file-thumb {
+    color: var(--formable-file-thumb-icon, var(--formable-text-muted));
+    background-color: var(
+      --formable-file-thumb-bg,
+      var(--formable-surface-raised)
+    );
+    border: var(--formable-border-width) solid
+      var(--formable-file-thumb-border, var(--formable-border));
+    border-radius: var(--formable-radius-sm);
+  }
+
+  .formable-field__file-progress {
+    border-radius: var(--formable-radius-full);
+    background-color: var(
+      --formable-file-progress-track-bg,
+      var(--formable-track)
+    );
+    overflow: hidden;
+  }
+
+  .formable-field__file-progress-bar {
+    background-color: var(
+      --formable-file-progress-fill,
+      var(--formable-color-accent-600)
+    );
+  }
+
+  /* Tighter than a standard small button - it's a single glyph, and one per
+     row of a list. */
+  .formable-file__remove {
+    flex-shrink: 0;
+    padding: var(--formable-space-1) var(--formable-space-3);
+    line-height: 1;
+  }
+
+  /* ----------------------------------------------------------------- actions */
+
+  /* One shape, three paints, one size scale. Every button Formable renders now
+     carries a variant class, which replaces the five near-identical bordered
+     treatments that used to be written out one control at a time - `--back`,
+     `--edit`, `--save`, `.formable-signature__clear` and
+     `.formable-table__add`/`__remove`.
+
+     The intent modifiers all stay on the elements as targeting hooks, because a
+     site may already be styling `--next` or `--submit`; they simply no longer
+     paint anything themselves.
+
+     The transparent border is what makes the variants interchangeable: a
+     primary button and a secondary one next to it are the same height because
+     both reserve the border box, whether or not the border is visible. */
+  .formable-button {
+    position: relative;
+    padding: var(--formable-control-padding-y) var(--formable-space-6);
+    font: inherit;
+    font-weight: var(--formable-font-weight-semibold);
+    border: var(--formable-border-width) solid transparent;
+    border-radius: var(--formable-radius);
+    cursor: pointer;
+    transition:
+      color var(--formable-duration-fast) var(--formable-ease),
+      background-color var(--formable-duration-fast) var(--formable-ease),
+      border-color var(--formable-duration-fast) var(--formable-ease);
+  }
+
+  /* Primary is also the paint a bare `.formable-button` gets, so hand-written
+     site markup keeps the filled treatment it has always had; `--primary`
+     names that treatment for new markup. This is where Next and Submit
+     finally get real emphasis - the shadow is what separates the one forward
+     action from the bordered controls beside it. */
+  .formable-button,
+  .formable-button--primary {
+    color: var(--formable-button-primary-text);
+    background-color: var(--formable-button-primary-bg);
+    box-shadow: var(--formable-shadow-sm);
+  }
+
+  /* Not one `:hover` rule shipped before this - every control was inert until
+     clicked. Disabled controls are excluded so they stay visibly unresponsive
+     - `[aria-disabled='true']` alongside `[disabled]` because `main.ts` keeps
+     a submitting nav button enabled and focusable, marking it inert with
+     `aria-disabled` instead. Each variant needs its own hover rule:
+     `:hover:not(...)` outranks a bare variant class, so without one the
+     primary hover fill would land on a secondary button. Gated behind
+     `(hover: hover)`, along with every other `:hover` rule in this file - a
+     touch tap has no hover to leave behind. See
+     [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-button:hover:not([disabled], [aria-disabled='true']),
+    .formable-button--primary:hover:not([disabled], [aria-disabled='true']) {
+      background-color: var(--formable-button-primary-bg-hover);
+    }
+  }
+
+  /* Secondary: bordered, transparent fill. The companion to a primary action -
+     Back and Save in the nav, Clear signature, Add a row. */
+  .formable-button--secondary {
+    color: var(--formable-button-secondary-text);
+    background-color: var(--formable-button-secondary-bg);
+    border-color: var(--formable-button-secondary-border);
+    box-shadow: none;
+  }
+
+  @media (hover: hover) {
+    .formable-button--secondary:hover:not([disabled], [aria-disabled='true']) {
+      background-color: var(--formable-button-secondary-bg-hover);
+      border-color: var(--formable-button-secondary-border-hover);
+    }
+  }
+
+  /* Ghost: no fill and no border at rest, for controls that sit inside other
+     content - Edit in the review list, Remove in a table row - where a third
+     bordered box would read as noise. The hover fill is the only thing it ever
+     paints. */
+  .formable-button--ghost {
+    color: var(--formable-button-ghost-text);
+    background-color: var(--formable-button-ghost-bg);
+    box-shadow: none;
+  }
+
+  @media (hover: hover) {
+    .formable-button--ghost:hover:not([disabled], [aria-disabled='true']) {
+      background-color: var(--formable-button-ghost-bg-hover);
+    }
+  }
+
+  /* Palette button style (`Palette::$buttonStyle`, 0089) -
+     a form-level choice of how the *primary* button paints, orthogonal to
+     the `--primary`/`--secondary`/`--ghost` element variants above. Both
+     blocks only re-point the three `--formable-button-primary-*` names the
+     primary rule and its hover rule already read by name above - no new rule
+     on `.formable-button` itself, the same mechanism `internal/decisions/
+     0073` relies on for the component tier: a property that reads a custom
+     property fresh at the point of use picks up whatever last declared that
+     name in scope, so overriding it here is the whole change.
+
+     `--outline` drops the fill entirely rather than adding a border - the
+     button's own border is a literal `transparent` reserving the border box
+     (see the comment above `.formable-button`), not a var, so painting an
+     actual outline would mean touching that rule too. A flat, brand-coloured
+     label with a light hover fill is what's achievable from this scope
+     alone, and reads as the lower-emphasis alternative to `--filled` on its
+     own merits. `--soft` tints the fill instead of flattening it, with
+     `color-mix()` blending the brand seed into the surface rather than a
+     precomputed tint - design rule 1, no PHP colour maths for a shade. Both
+     fall back to `--formable-button-bg` so a form with no brand set still
+     gets a sensible, achromatic outline/soft treatment rather than an
+     accent-blue one. */
+  .formable-form--buttons-outline {
+    --formable-button-primary-bg: transparent;
+    --formable-button-primary-bg-hover: var(--formable-surface-raised);
+    --formable-button-primary-text: var(
+      --formable-brand,
+      var(--formable-button-bg)
+    );
+  }
+
+  .formable-form--buttons-soft {
+    --formable-button-primary-bg: color-mix(
+      in srgb,
+      var(--formable-brand, var(--formable-button-bg)) 15%,
+      var(--formable-surface)
+    );
+    --formable-button-primary-bg-hover: color-mix(
+      in srgb,
+      var(--formable-brand, var(--formable-button-bg)) 25%,
+      var(--formable-surface)
+    );
+    --formable-button-primary-text: var(
+      --formable-brand,
+      var(--formable-button-bg)
+    );
+  }
+
+  /* Size scale, orthogonal to the variants: the unmodified button is the nav
+     size, `--sm` is for a control nested in other content, `--lg` for a
+     standalone call to action. Padding and type size move together; the radius
+     deliberately doesn't, so the three sizes still read as one family. */
+  .formable-button--sm {
+    padding: var(--formable-space-1) var(--formable-space-4);
+    font-size: var(--formable-font-size-sm);
+  }
+
+  /* `--sm`'s own vertical padding lands at roughly 31px tall (`--space-1` top
+     and bottom, one line of `--font-size-sm` text, the border) - well under
+     the 44px a coarse pointer needs. Raising the block padding to
+     `--space-4` clears it without touching the variant's own type scale.
+     See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (pointer: coarse) {
+    .formable-button--sm {
+      padding-block: var(--formable-space-4);
+    }
+  }
+
+  .formable-button--lg {
+    padding: var(--formable-space-4) var(--formable-space-8);
+    font-size: var(--formable-font-size-lg);
+  }
+
+  /* Colour only - width, style and offset come from the `formable.contract`
+     ring shape, which is the last layer and wins the shape outright. The
+     filled control needs one extra step of offset to read as a ring rather
+     than a second border, so widen it by overriding the token the contract
+     rule reads rather than restating `outline-offset` (which contract would
+     beat). */
+  .formable-button:focus-visible {
+    outline-color: var(--formable-focus-ring-color);
+    --formable-focus-ring-offset: 2px;
+  }
+
+  /* `setSubmitting()` in `main.ts` sets `aria-busy="true"` on a nav button
+     while its request is in flight. The label stays laid out - only its
+     opacity drops - so hiding it can't change the button's width; the ring is
+     drawn on top of the same box with `currentColor`, so it automatically
+     matches whichever variant (`--primary`/`--secondary`/`--ghost`) is busy
+     without a token of its own. */
+  .formable-button[aria-busy='true'] .formable-button__label {
+    opacity: 0;
+  }
+
+  .formable-button[aria-busy='true']::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 1em;
+    height: 1em;
+    border: 0.15em solid currentcolor;
+    border-inline-end-color: transparent;
+    border-radius: 50%;
+    animation: formable-spin 0.6s linear infinite;
+  }
+
+  @keyframes formable-spin {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  /* An infinite spin can't be silenced by slowing it down the way the two
+     shared duration tokens silence transitions above - a near-zero loop just
+     strobes. Stopping it on the last frame leaves a static ring, which still
+     reads as "busy" without the motion. */
+  @media (prefers-reduced-motion: reduce) {
+    .formable-button[aria-busy='true']::after {
+      animation: none;
+    }
+  }
+
+  /* ------------------------------------------------------------------- progress */
+
+  /* `_progress.twig` puts `formable-progress--bar` or `--steps` on the wrapper
+     to match `settings.progressIndicator`; both are left as targeting hooks for
+     a site's own overrides, with the paint on the children below - the same
+     intent-modifier-without-paint shape `--next`/`--submit` use on buttons
+     (2.7). */
+  .formable-progress__label {
+    margin: 0;
+    font-size: var(--formable-font-size-sm);
+    color: var(--formable-progress-label-text, var(--formable-text-muted));
+  }
+
+  .formable-progress__track {
+    height: var(--formable-progress-track-height);
+    background-color: var(--formable-progress-track-bg, var(--formable-track));
+    border-radius: var(--formable-radius-full);
+    overflow: hidden;
+  }
+
+  /* `border-radius: inherit` rounds the leading edge of a part-filled bar; the
+     track's `overflow: hidden` handles the trailing one. The transition is what
+     makes an AJAX page change read as movement rather than a jump - the fill is
+     re-rendered at its new width on every step. `width` itself is set by
+     `renderStyleVars()` in `main.ts` from `data-percent` (CSP - see
+     `_progress.twig`); the `0` here is only what a no-JS visitor sees, who
+     still gets the real progress from the textual label beside the bar. */
+  .formable-progress__fill {
+    width: 0;
+    height: 100%;
+    background-color: var(--formable-progress-fill);
+    border-radius: inherit;
+    transition: width var(--formable-duration-base) var(--formable-ease);
+  }
+
+  /* The track and the fill both resolve to system colours under forced
+     colours, which can collapse the two backgrounds to the same shade -
+     exactly the distinction `--formable-progress-fill` exists to draw. A
+     border stays visible whatever colour the fill lands on; `box-sizing`
+     keeps it from adding to the width a script just set inline. */
+  @media (forced-colors: active) {
+    .formable-progress__fill {
+      box-sizing: border-box;
+      border: var(--formable-border-width) solid CanvasText;
+    }
+  }
+
+  /* The step's own box is the containing block for the connector below, and
+     the circle is opaque and raised above it: the line then runs from one
+     circle's centre to the next and vanishes under both ends, which is what
+     lets a single pair of declarations serve every state. Without the
+     `z-index` the parent's positioned pseudo-element would paint over the
+     in-flow circle. */
+  .formable-progress__step {
+    position: relative;
+  }
+
+  .formable-progress__step-number {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    width: var(--formable-progress-step-size);
+    height: var(--formable-progress-step-size);
+    font-size: var(--formable-font-size-xs);
+    background-color: var(--formable-progress-step-bg, var(--formable-surface));
+    border-radius: var(--formable-radius-full);
+    border: var(--formable-border-width) solid
+      var(--formable-progress-step-border, var(--formable-border));
+    color: var(--formable-progress-step-text, var(--formable-text-muted));
+  }
+
+  .formable-progress__step-label {
+    font-size: var(--formable-font-size-xs);
+    line-height: var(--formable-line-height-tight);
+    color: var(--formable-progress-step-label-text, var(--formable-text-muted));
+  }
+
+  /* Drawn forward from every step but the last. The reset sizes the items
+     equally, so one item's own length plus the list gap is exactly the distance
+     between two circle centres - one calculation, both orientations, any number
+     of pages. */
+  .formable-progress__step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    inset-block-start: 50%;
+    inset-inline-start: calc(
+      (var(--formable-progress-step-size) - var(--formable-border-width)) / 2
+    );
+    width: var(--formable-border-width);
+    height: calc(100% + var(--formable-space-4));
+    background-color: var(--formable-progress-track-bg, var(--formable-track));
+  }
+
+  /* A container query, matching the orientation switch `formable-reset.css`
+     puts on `.formable-progress__steps` itself - a viewport query here would
+     draw a horizontal connector under a stepper the reset has already
+     stacked vertically inside a narrow container. See
+     [[frontend-embeddability-review]] chunk 5.
+
+     `inset-inline-start` rather than `left`: under `dir="rtl"` the stepper's
+     `flex-direction: row` already lays the next page's step to the visual
+     left, and an inline-start-anchored box with no `inset-inline-end` grows
+     in the inline-progression direction - right in LTR, left in RTL - so the
+     line reaches the next circle in both directions with no extra rule. See
+     [[frontend-embeddability-review]] chunk 8. */
+  @container formable-step (inline-size >= 40rem) {
+    .formable-progress__step:not(:last-child)::after {
+      inset-block-start: calc(
+        (var(--formable-progress-step-size) - var(--formable-border-width)) / 2
+      );
+      inset-inline-start: 50%;
+      width: calc(100% + var(--formable-space-4));
+      height: var(--formable-border-width);
+    }
+  }
+
+  /* Every step behind the submitter is done, so the line leading away from a
+     done step is a travelled one. `:not(:last-child)` is repeated rather than
+     dropped: without it this selector is a step less specific than the one
+     above and the travelled line stays grey. */
+  .formable-progress__step--done:not(:last-child)::after {
+    background-color: var(--formable-progress-fill);
+  }
+
+  /* A plain `background-color` on a purely decorative box, with no border of
+     its own - exactly the shape forced colours is least likely to preserve,
+     as opposed to a bordered element's `border-color` (see the progress fill
+     a few rules up, which keeps its background this way *because* it also
+     has an explicit border). `CanvasText` is a system colour, exempt from
+     the remapping that would otherwise be applied to it, so it renders
+     regardless of what a browser does with the two tokens above; the
+     travelled/untravelled distinction those tokens draw doesn't survive, but
+     the line no longer risks vanishing outright either way. See
+     [[frontend-embeddability-review]] chunk 10 (L5). */
+  @media (forced-colors: active) {
+    .formable-progress__step:not(:last-child)::after,
+    .formable-progress__step--done:not(:last-child)::after {
+      background-color: CanvasText;
+    }
+  }
+
+  .formable-progress__step--current .formable-progress__step-number {
+    background-color: var(--formable-progress-fill);
+    border-color: var(--formable-progress-fill);
+    color: var(--formable-progress-text);
+  }
+
+  /* Current and upcoming steps both fall back to the same border under
+     forced colours (the fill and the resting-state border tokens are
+     equally subject to remapping), losing the one distinction `--current`
+     exists to draw. `border-style` survives that remapping - dashed is
+     already spoken for by the invalid-input signal above, so a doubled
+     width stands in as this state's own colour-independent tell. See
+     [[frontend-embeddability-review]] chunk 10 (L5). */
+  @media (forced-colors: active) {
+    .formable-progress__step--current .formable-progress__step-number {
+      border-width: calc(var(--formable-border-width) * 2);
+    }
+  }
+
+  .formable-progress__step--current .formable-progress__step-label {
+    color: var(
+      --formable-progress-step-label-text-current,
+      var(--formable-text)
+    );
+    font-weight: var(--formable-font-weight-semibold);
+  }
+
+  .formable-progress__step--done .formable-progress__step-number {
+    border-color: var(--formable-progress-fill);
+    color: transparent;
+  }
+
+  /* The number stays in the DOM and the tick is painted over it, so a screen
+     reader still hears "1" where a sighted user sees a check - the visual
+     shorthand costs nothing in the accessibility tree. Painted as a mask
+     because a data URI can't resolve `currentColor`: this way the glyph follows
+     `--formable-progress-fill` wherever a site moves it, and keeps following it
+     when 4.7 repaints for dark mode. */
+  .formable-progress__step--done .formable-progress__step-number::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-color: var(--formable-progress-fill);
+    mask: var(--formable-progress-check) center / 1rem no-repeat;
+  }
+
+  /* A mask painted with `background-color` isn't guaranteed to survive forced
+     colours the way a plain background does, so the tick can vanish there -
+     and the digit underneath is `color: transparent`, its own colour signal
+     already given up to the tick above it. Rather than gamble on the mask,
+     drop it under forced colours and give the digit its colour back, so a
+     done step still reads as a step by the number alone. */
+  @media (forced-colors: active) {
+    .formable-progress__step--done .formable-progress__step-number {
+      color: CanvasText;
+    }
+
+    .formable-progress__step--done .formable-progress__step-number::after {
+      content: none;
+    }
+  }
+
+  /* --------------------------------------------------------------------- review */
+
+  /* The review step's title (`_review.twig`) stands in for a page label when the
+     review replaces a page, so it takes the same size, weight and leading as
+     `.formable-page__label`. */
+  .formable-review__heading {
+    margin: 0;
+    font-size: var(--formable-font-size-2xl);
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-tight);
+  }
+
+  .formable-review__page {
+    padding: var(--formable-space-5);
+    border: var(--formable-border-width) solid
+      var(--formable-group-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  .formable-review__page-label {
+    margin: 0;
+    font-size: var(--formable-font-size-base);
+  }
+
+  .formable-review__question {
+    font-weight: var(--formable-font-weight-semibold);
+    color: var(--formable-review-question-text, var(--formable-text-muted));
+  }
+
+  .formable-review__value {
+    margin: 0;
+  }
+
+  /* --------------------------------------------------------------- save & resume */
+
+  .formable-save__label {
+    flex-basis: 100%;
+    font-size: var(--formable-font-size-xs);
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+
+  /* Used to be a bespoke padding/border/radius rule with no `font: inherit`,
+     no `box-sizing`, no `min-height` and no focus ring of its own - the
+     `.formable-input` class on the element now (`_nav.twig`) supplies all of
+     it directly, and matches the button beside it instead of drifting from
+     it. See [[frontend-embeddability-review]] chunk 10 (L2). */
+
+  /* ------------------------------------------------------------------ signature */
+
+  /* Sizing is the reset's business now (`inline-size`, `max-inline-size`,
+     `aspect-ratio` - [[frontend-embeddability-review]] chunk 9); the bundle
+     rescales the backing store in device pixels to match whatever that
+     resolves to. Reads the input-shaped box's tokens, same as
+     `.formable-signature__typed` below - both stand in for the same control
+     and should retint together. */
+  .formable-signature__canvas {
+    background-color: var(--formable-input-bg, var(--formable-surface));
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+    cursor: crosshair;
+  }
+
+  /* `signature.ts` adds `--signed` to the wrapper once the pad has ink. A quiet
+     done-signal - the canvas border picks up the success tint - rather than
+     the state class painting nothing. */
+  .formable-signature--signed .formable-signature__canvas {
+    border-color: var(
+      --formable-signature-success-border,
+      var(--formable-success)
+    );
+  }
+
+  .formable-signature__hint {
+    margin: 0;
+    font-size: var(--formable-font-size-xs);
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+
+  .formable-signature__typed {
+    align-self: stretch;
+    max-width: 100%;
+    padding: var(--formable-space-2) var(--formable-space-3);
+    font: inherit;
+    color: var(--formable-input-text, var(--formable-text));
+    background-color: var(--formable-input-bg, var(--formable-surface));
+    border: var(--formable-border-width) solid
+      var(--formable-input-border, var(--formable-border));
+    border-radius: var(--formable-radius);
+  }
+
+  .formable-signature__typed:focus-visible {
+    outline-color: var(--formable-focus-ring-color);
+  }
+
+  /* ---------------------------------------------------------------------- table */
+
+  .formable-table th {
+    font-size: var(--formable-font-size-xs);
+    color: var(--formable-table-header-text, var(--formable-text-muted));
+    border-block-end: var(--formable-border-width) solid
+      var(--formable-table-header-border, var(--formable-border));
+  }
+
+  /* `--formable-table-row-bg-alt` defaults to the same value as
+     `--formable-option-bg-hover` - a striped row and a hovered checkbox/radio
+     row read as the same "this row" language out of the box - but the two
+     are independent component tokens, so retinting one doesn't move the
+     other (2.4). */
+  .formable-table tbody tr:nth-child(even) {
+    background-color: var(
+      --formable-table-row-bg-alt,
+      var(--formable-surface-raised)
+    );
+  }
+
+  /* See [[frontend-embeddability-review]] chunk 10 (L2). */
+  @media (hover: hover) {
+    .formable-table tbody tr:hover {
+      background-color: var(
+        --formable-table-row-bg-alt,
+        var(--formable-surface-raised)
+      );
+    }
+  }
+
+  /* The card look at narrow container widths (the structural switch itself -
+     display, the dropped header row - lives in the reset layer). The
+     striping above still paints underneath it; a border is what actually
+     separates one row-turned-card from the next once they're no longer
+     ruled lines in a shared table. */
+  @container formable-step (inline-size < 40rem) {
+    .formable-table tr {
+      padding: var(--formable-space-3);
+      border: var(--formable-border-width) solid
+        var(--formable-group-border, var(--formable-border));
+      border-radius: var(--formable-radius);
+    }
+
+    .formable-table__cell-label {
+      font-size: var(--formable-font-size-xs);
+      color: var(--formable-table-header-text, var(--formable-text-muted));
+    }
+  }
+
+  /* Scroll-shadow hint for `.formable-table-scroll` (structure in the reset
+     layer). Four background layers, not one: the outer two are the shadow,
+     pinned to the container's edges (`background-attachment: scroll` keeps
+     them fixed relative to the viewport, not the content); the inner two are
+     `--formable-table-scroll-fade`-coloured fades that scroll *with* the
+     content (`attachment: local`) and cover the shadow once there's nothing
+     left in that direction to scroll to. No JavaScript involved - a table
+     that doesn't overflow shows no hint because both edges start already
+     covered. */
+  .formable-table-scroll {
+    background-image:
+      linear-gradient(
+        to right,
+        var(--formable-table-scroll-fade, var(--formable-surface)) 50%,
+        transparent
+      ),
+      linear-gradient(
+        to left,
+        var(--formable-table-scroll-fade, var(--formable-surface)) 50%,
+        transparent
+      ),
+      linear-gradient(
+        to right,
+        var(
+          --formable-table-scroll-shadow,
+          color-mix(in srgb, var(--formable-text) 12%, transparent)
+        ),
+        transparent
+      ),
+      linear-gradient(
+        to left,
+        var(
+          --formable-table-scroll-shadow,
+          color-mix(in srgb, var(--formable-text) 12%, transparent)
+        ),
+        transparent
+      );
+    background-repeat: no-repeat;
+    background-position: left, right, left, right;
+    background-size:
+      1.5rem 100%,
+      1.5rem 100%,
+      0.75rem 100%,
+      0.75rem 100%;
+    background-attachment: local, local, scroll, scroll;
+  }
+
+  /* Nothing paints `.formable-table__add` or `.formable-table__remove` any
+     more - both are `.formable-button` variants in the markup, and the class
+     survives only as a targeting hook. `__add`'s top margin moved to the
+     reset, where the rest of the table's spacing already lives. */
+
+  /* -------------------------------------------------------------- resume page */
+
+  /* `_resume.twig` is the one template that renders a full HTML document
+     rather than embedding into a page the site already styles - there's no
+     host chrome to inherit a font stack, a measure, or (in dark mode) a
+     readable background from, so this is the one place the theme paints the
+     page itself and not just the form on it. `_resume.twig` forces the
+     `default` theme level for its own render regardless of the site's
+     `themeLevel` setting, so this can rely on always being loaded there.
+
+     `body:has(> .formable-resume-page)` scopes the page-level rule to that
+     template alone - every other page in the plugin only ever embeds a
+     themed form, never owns the page around it, so this can't leak into one
+     of those. `Canvas`/`CanvasText` (not a `--formable-*` token) are the
+     system colours that follow `color-scheme` on their own - what a page
+     background needs, and no form widget does. */
+  body:has(> .formable-resume-page) {
+    margin: 0;
+    color-scheme: light dark;
+    background-color: Canvas;
+    color: CanvasText;
+  }
+
+  .formable-resume-page {
+    max-width: 40rem;
+    margin: 0 auto;
+    padding: var(--formable-space-10) var(--formable-space-5);
+    font-family:
+      system-ui,
+      -apple-system,
+      'Segoe UI',
+      sans-serif;
+  }
+
+  .formable-resume-page h1 {
+    margin: 0 0 var(--formable-space-3);
+    font-size: var(--formable-font-size-2xl);
+    font-weight: var(--formable-font-weight-semibold);
+    line-height: var(--formable-line-height-tight);
+  }
+
+  .formable-resume-page__intro {
+    margin: 0 0 var(--formable-space-8);
+    color: var(--formable-field-hint-text, var(--formable-text-muted));
+  }
+}
+
+/**
+ * Control paint, hardened against host CSS - deliberately outside
+ * `@layer formable.theme`, for the same reason and by the same mechanism as
+ * `formable-hardening.css` (see that file's header): an unlayered host reset
+ * beats anything in this layer regardless of specificity, and Tailwind
+ * Preflight's `button { background-color: transparent }` plus its universal
+ * `border-width: 0` are exactly that - they zero every input's border and
+ * empty the primary button's fill (H3), leaving white text on a white page.
+ *
+ * This lives here rather than in `formable-hardening.css` on purpose: that
+ * file ships at every theme level, including `contract`, which promises "no
+ * paint" in its own header comment. Background and border-width/style are
+ * unambiguously paint, so restoring them has to depend on `formable-theme.css`
+ * actually being loaded - shipping it everywhere would put a filled button on
+ * a site that explicitly asked for bare markup. `internal/decisions/0069`
+ * records the split.
+ *
+ * Each rule restates only `border-width`/`border-style` (never `border-color`)
+ * and, for the primary button only, `background-color` - each reading the
+ * same `--formable-*` component token the layered rule above already uses, so
+ * a site theming through the documented token overrides
+ * (`docs/theming.md#how-overriding-works`) is unaffected either way; only an
+ * unlayered *selector* override now needs to match this rule's (0,2,0)
+ * specificity to win, the same trade-off `formable-hardening.css` describes.
+ * Secondary and ghost buttons are untouched - their background token already
+ * resolves to `transparent`, so a host zeroing it changes nothing.
+ */
+.formable-input.formable-input,
+.formable-multiselect__control.formable-multiselect__control,
+.formable-multiselect__chip.formable-multiselect__chip,
+.formable-multiselect__listbox.formable-multiselect__listbox,
+.formable-button.formable-button {
+  border-width: var(--formable-border-width);
+  border-style: solid;
+}
+
+.formable-file__dropzone.formable-file__dropzone {
+  border-width: var(--formable-border-width);
+  border-style: dashed;
+}
+
+.formable-button--primary.formable-button--primary {
+  background-color: var(--formable-button-primary-bg);
+}
+
+/* Same mechanism, for the rhythm this file - not `formable-hardening.css` -
+   already owns: `p`/`h1`-`h6` inside Formable's own chrome, never field
+   content (host-typography by design, principle 6 of
+   `internal/decisions/0053`). Tailwind Typography's `.prose :where(p)` is the
+   concrete case - `:where()` carries no specificity, so the whole selector is
+   only as strong as `.prose` itself, but being unlayered it still wins over
+   the `margin: 0` above outright. `formable-form__errors-list` restates its
+   bulleted, indented look the same way, rather than losing its marker to a
+   host `ul, ol { list-style: none }`. */
+.formable-page__label.formable-page__label,
+.formable-heading.formable-heading,
+.formable-form__errors-message.formable-form__errors-message {
+  margin: 0;
+}
+
+.formable-html.formable-html > :first-child {
+  margin-block-start: 0;
+}
+
+.formable-html.formable-html > :last-child {
+  margin-block-end: 0;
+}
+
+.formable-form__errors-list.formable-form__errors-list {
+  margin-block: var(--formable-space-3) 0;
+  margin-inline: 0;
+  padding-inline-start: 1.125rem;
+  list-style: disc;
+}

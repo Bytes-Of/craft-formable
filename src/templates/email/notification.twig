@@ -1,0 +1,39 @@
+{# @var body \Twig\Markup - the notification's rendered body, or the all-fields table when it was left blank #}
+{# @var subject string #}
+{# @var notification \bytesof\formable\models\Notification #}
+{# @var submission \bytesof\formable\elements\Submission #}
+{# @var form \bytesof\formable\elements\Form #}
+{# @var values array #}
+{# @var allFields \Twig\Markup #}
+{#
+ # The document every notification is sent in.
+ #
+ # Resolved like the front-end pack: `email/notification.twig` under the form's
+ # Custom Template Path wins, then `formable/email/notification.twig` in the
+ # site's templates folder, then this file. Styles are inline and the layout is
+ # nested tables, because that is what survives the email clients that strip
+ # everything else. The plain-text part is derived from whatever this renders.
+ #}
+<!DOCTYPE html>
+<html lang="{{ craft.app.language }}">
+<head>
+    <meta charset="{{ craft.app.charset }}">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ subject }}</title>
+</head>
+<body style="margin:0;padding:0;background:#f3f4f6;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;background:#f3f4f6;">
+        <tr>
+            <td style="padding:24px 16px;">
+                <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:separate;max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #e3e5e8;border-radius:4px;">
+                    <tr>
+                        <td style="padding:24px;font-family:-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;font-size:14px;line-height:1.5;color:#20252b;">
+                            {{ body }}
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>

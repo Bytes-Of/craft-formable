@@ -1,0 +1,36 @@
+{% if submissions is empty %}
+    <p class="zilch">{{ 'No submissions yet.'|t('formable') }}</p>
+{% else %}
+    <table class="data fullwidth">
+        <tbody>
+            {% for submission in submissions %}
+                {% set status = submission.getStatusModel() %}
+                <tr>
+                    <td>
+                        <a href="{{ submission.cpEditUrl }}">{{ submission.title ?: submission.id }}</a>
+                    </td>
+                    <td class="thin light">{{ submission.form ? submission.form.title : '' }}</td>
+                    <td class="thin">{{ status ? status.name : '' }}</td>
+                    <td class="thin light rightalign">
+                        {{ submission.dateCreated ? submission.dateCreated|timestamp('short') : '' }}
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% endif %}
+
+{% if submissions is not empty or spam > 0 %}
+    <p class="light">
+        {% if submissions is not empty %}
+            <a href="{{ cpUrl('formable/submissions') }}">
+                {{ 'View all {total} submissions'|t('formable', { total: total }) }}
+            </a>
+        {% endif %}
+        {% if spam > 0 %}
+            <span class="formable-widget-spam" style="margin-left:.5em;">
+                {{ '{count} flagged as spam'|t('formable', { count: spam }) }}
+            </span>
+        {% endif %}
+    </p>
+{% endif %}

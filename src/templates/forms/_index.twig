@@ -1,0 +1,12 @@
+{% extends '_layouts/elementindex' %}
+
+{% set title = 'Forms'|t('formable') %}
+{% set elementType = 'bytesof\\formable\\elements\\Form' %}
+
+{% block actionButton %}
+    {% if currentUser.can('formable:saveForms') %}
+        <a href="{{ cpUrl('formable/forms/new') }}" class="btn submit add icon">
+            {{ 'New form'|t('formable') }}
+        </a>
+    {% endif %}
+{% endblock %}

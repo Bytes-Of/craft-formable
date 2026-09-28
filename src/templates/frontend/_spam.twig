@@ -1,0 +1,49 @@
+{#
+ # The invisible spam controls that live in the form shell (not the swappable
+ # step): the honeypot decoy, the signed render timestamp, and the JS-token
+ # field the front-end bundle stamps.
+ #
+ # Rendered once per form and never swapped, so the timestamp is minted at
+ # render and the JS token has a stable field to be written into.
+ #
+ # Variables:
+ #   spam    the form's front-end spam config (honeypotField, timeField,
+ #           timeToken, jsField), or not set
+ #   formId  this render's unique form id (see `form.twig`) - namespaces the
+ #           honeypot's `id`/`<label for>` pair so two renders of the same
+ #           form on one page don't mint the same one. `name` stays the bare
+ #           `spam.honeypotField` regardless - the server checks the posted
+ #           field by that name alone, not by id.
+ #}
+{% if spam is defined and spam %}
+    {% if spam.honeypotField %}
+        {% set honeypotId = (formId ?? 'formable') ~ '-' ~ spam.honeypotField %}
+        {# Hidden from people (and from assistive tech), irresistible to a bot
+           that fills every field it finds. autocomplete off and tabindex -1 so
+           a real submitter never lands on or auto-fills it. `.formable-visually-
+           hidden` (not an inline `style`, so a strict CSP can't strip it back
+           into view) clips the box in place rather than shoving it off-screen -
+           the old `left: -9999px` also created a ~10,000px horizontal scroll on
+           an RTL page. #}
+        <div aria-hidden="true" class="formable-visually-hidden">
+            <label for="{{ honeypotId }}">{{ 'Leave this field blank'|t('formable') }}</label>
+            <input type="text"
+                id="{{ honeypotId }}"
+                name="{{ spam.honeypotField }}"
+                tabindex="-1"
+                autocomplete="off"
+                value=""
+                data-formable-honeypot>
+        </div>
+    {% endif %}
+
+    {% if spam.timeToken %}
+        <input type="hidden" name="{{ spam.timeField }}" value="{{ spam.timeToken }}">
+    {% endif %}
+
+    {% if spam.jsField %}
+        {# Empty on arrival; the front-end bundle writes to it, so a value proves
+           JavaScript ran. A direct post that never loads the page leaves it empty. #}
+        <input type="hidden" name="{{ spam.jsField }}" value="" data-formable-js-token>
+    {% endif %}
+{% endif %}

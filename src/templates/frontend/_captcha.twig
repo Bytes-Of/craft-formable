@@ -1,0 +1,37 @@
+{#
+ # The captcha placeholder for the final step (Pro).
+ #
+ # Only the container and the provider's public data are rendered here; the
+ # front-end bundle loads the provider script and renders the widget into it.
+ # Doing it from the bundle (rather than the provider's own auto-scan) is what
+ # lets a captcha render on an AJAX-swapped step too, where an auto-scan that
+ # already ran on page load would never fire again. Every captcha needs
+ # JavaScript to produce a token regardless, so nothing is lost by requiring the
+ # bundle to place it.
+ #
+ # reCAPTCHA v3 is invisible - no widget, just a hidden input the bundle fills
+ # from a background token.
+ #
+ # Variables:
+ #   captcha   the provider's front-end data (type, siteKey, widgetClass,
+ #             responseParam, scriptUrl, invisible), or not set
+ #}
+{% if captcha is defined and captcha %}
+    <div class="formable-captcha"
+        data-formable-captcha
+        data-captcha-type="{{ captcha.type }}"
+        data-captcha-sitekey="{{ captcha.siteKey }}"
+        data-captcha-widget-class="{{ captcha.widgetClass }}"
+        data-captcha-response="{{ captcha.responseParam }}"
+        data-captcha-script="{{ captcha.scriptUrl }}"
+        {%- if captcha.invisible %} data-captcha-invisible{% endif %}>
+        {% if captcha.invisible %}
+            <input type="hidden" name="{{ captcha.responseParam }}" value="" data-formable-captcha-token>
+        {% endif %}
+    </div>
+    <noscript>
+        <p class="formable-captcha__noscript">
+            {{ 'Please enable JavaScript to complete this form.'|t('formable') }}
+        </p>
+    </noscript>
+{% endif %}

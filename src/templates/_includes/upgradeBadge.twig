@@ -1,0 +1,67 @@
+{#
+ # Reusable "Pro" edition surfaces for the control panel.
+ #
+ #   styles()        - registers the shared CSS. Import the macro and call this
+ #                     once near the top of any template that uses badge/prompt.
+ #   badge()         - a small "Pro" pill for labelling a Pro-only heading;
+ #                     shown in every edition.
+ #   prompt(feature) - a Lite upgrade call-to-action: the pill, a short line of
+ #                     copy, and an "Upgrade" link to the plugin's edition page.
+ #                     Callers should only render this when the edition is Lite.
+ #}
+
+{% macro badge() %}
+    <span class="formable-pro-pill">{{ 'Pro'|t('formable') }}</span>
+{% endmacro %}
+
+{% macro prompt(feature) %}
+    {% from _self import badge %}
+    <div class="formable-upgrade">
+        {{ badge() }}
+        <span class="formable-upgrade__text">
+            {{ '{feature} is a Formable Pro feature.'|t('formable', { feature: feature }) }}
+        </span>
+        <a class="formable-upgrade__link" href="{{ url('settings/plugins/formable') }}#formable-editions">
+            {{ 'Upgrade to Pro'|t('formable') }}
+        </a>
+    </div>
+{% endmacro %}
+
+{% macro styles() %}
+    {% css %}
+        .formable-pro-pill {
+            display: inline-block;
+            padding: 1px 7px;
+            border-radius: 9px;
+            background: var(--gray-100, #e9edf4);
+            color: var(--gray-600, #3d5a80);
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: .03em;
+            vertical-align: middle;
+        }
+
+        .formable-upgrade {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin: 8px 0 16px;
+            padding: 10px 14px;
+            border: 1px solid var(--hairline-color, #e3e5e8);
+            border-radius: 5px;
+            background: var(--gray-050, #f9fafc);
+            font-size: 13px;
+        }
+
+        .formable-upgrade__text {
+            color: var(--medium-text-color, #606d7b);
+        }
+
+        .formable-upgrade__link {
+            margin-left: auto;
+            font-weight: 600;
+        }
+    {% endcss %}
+{% endmacro %}

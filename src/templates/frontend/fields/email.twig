@@ -1,0 +1,16 @@
+{{ include(craft.formable.template('fields/text', templatePath ?? null)) }}
+{% if field.requireConfirmation %}
+    {# Posts outside `fields[…]` - a `fields[email][confirm]` sibling would
+       turn the address itself into an array and lose it. #}
+    <label class="formable-field__label formable-field__label--confirm" for="{{ inputId }}-confirm">
+        {{ 'Confirm {label}'|t('formable', { label: field.label }) }}
+    </label>
+    <input type="email"
+        id="{{ inputId }}-confirm"
+        name="{{ field.subValueNames.confirm }}"
+        data-formable-subvalue="confirm"
+        class="formable-input formable-input--text"
+        autocomplete="off"
+        {%- if field.required %} required{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+{% endif %}

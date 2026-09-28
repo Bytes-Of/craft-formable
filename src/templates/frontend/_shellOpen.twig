@@ -1,0 +1,180 @@
+{#
+ # The opening half of the form shell: everything from the success notice
+ # through the error summary, up to (but not including) the author's own
+ # field markup. Paired with `_shellClose.twig`, which closes what this opens.
+ #
+ # `form.twig` includes this above its own `<div data-formable-step>` - the
+ # surface from the success notice through the error summary is identical
+ # either way, apart from `fieldsByHandle`/`fieldIdPrefix` and the
+ # shell-only/`form.twig`-only variables noted below. See
+ # internal/decisions/0093.
+ #
+ # Variables:
+ #   form            Form element
+ #   options         the render's own options - `options.id` for a stable form
+ #                   id, `options.class` for extra classes on the `<form>`
+ #   flowId          identifies this pass through the form (per-tab progress
+ #                   slot) - also the `formableFlow` hidden input's value
+ #   formId          this render's unique form id (see `form.twig`)
+ #   headingLevel    heading level the success heading starts from (default 2)
+ #   settings        FormSettings, already localized to the current site
+ #                   ({@see \bytesof\formable\services\Translations::localizeSettings()})
+ #   errorMessage    settings.errorMessage, rendered (it may carry author Twig) -
+ #                   see {@see \bytesof\formable\services\Rendering::renderMessage()}
+ #   errors          field errors keyed by handle
+ #   hasErrors       whether the summary below renders populated
+ #   fieldsByHandle  every field the summary can link to, keyed by handle -
+ #                   `form.twig` scopes this to the current page's rows, the
+ #                   shell passes every page (the author may lay out any field)
+ #   fieldIdPrefix   the id prefix the summary's anchors are built from,
+ #                   matching whatever this render actually gave each field's
+ #                   control - "{formId}-field-" from `form.twig`, "formable-"
+ #                   from the shell, where `renderField()` leaves fields on
+ #                   their bare id (decision 0068)
+ #   successMessage  flashed message from a completed non-JS submit, or null
+ #   successDetails  settings.getSuccessDetails(), rendered, or null
+ #   colorScheme     resolved light | dark | auto, emitted as data-formable-scheme
+ #   palette         resolved Palette - radius/buttonStyle always carry a concrete value
+ #   paletteHash     key for the registered palette CSS block, or null when nothing is set
+ #   paletteVarsJson the palette's CSS declarations as JSON, or null - read by style-vars.ts's CSP repair pass
+ #   hasFileUploads  whether any field uploads files (drives the enctype)
+ #   isShell         whether this render is the shell's own flat page rather
+ #                   than `form.twig`'s step-based flow - `_step.twig` supplies
+ #                   its own `pageIndex` input, so only the shell path needs
+ #                   one minted here
+ #   accepting       whether the form is currently accepting submissions;
+ #                   defaults to true - `form.twig` never sees the closed
+ #                   branch below, `renderForm()` already returns
+ #                   `renderClosed()` before reaching here
+ #   closedMessage   the resolved closed message, only read when `accepting`
+ #                   is false
+ #   spam            the form's front-end spam config, or not set
+ #   templatePath    the form's template override directory, or null
+ #}
+{% set accepting = accepting ?? true %}
+{% set headingLevel = headingLevel ?? 2 %}
+{% set messageId = "#{formId}-message" %}
+{% set successId = "#{formId}-success" %}
+{# `compact` gets a wrapper class the stylesheet keys its token overrides off; `comfortable` adds nothing. #}{% set densityClass = settings.density == 'compact' ? ' formable-form--compact' : '' %}
+{% set labelPositionClass = settings.labelPosition == 'left' ? ' formable-form--labels-left' : '' %}
+{% set appearanceClass = settings.appearance == 'bordered' ? ' formable-form--bordered' : '' %}
+{# `soft`/`filled` are Palette's own defaults - already what the unclassed CSS
+   paints, so only a value that differs from it needs a class, the same shape
+   density/labelPosition/appearance use above. #}
+{% set radiusClass = palette.radius == 'sharp' ? ' formable-form--radius-sharp' : (palette.radius == 'round' ? ' formable-form--radius-round' : '') %}
+{% set buttonStyleClass = palette.buttonStyle == 'outline' ? ' formable-form--buttons-outline' : (palette.buttonStyle == 'soft' ? ' formable-form--buttons-soft' : '') %}
+{% set cssClass = settings.cssClass ? ' ' ~ settings.cssClass : '' %}
+
+{% if successMessage and settings.successBehavior == 'message' %}
+    {# The message is the heading - it's already the one line of copy this
+       state has (`settings.successMessage`), so there's no second, generic
+       "Success!" string to keep translated alongside it. `handleSuccess()` and
+       `handleSaved()` in `main.ts` build this same icon + heading shape. #}
+    <div class="formable-success" id="{{ successId }}" role="status" tabindex="-1"
+        data-formable-success
+        data-formable-scheme="{{ colorScheme }}"
+        {%- if paletteHash %} data-formable-palette="{{ paletteHash }}" data-formable-palette-vars="{{ paletteVarsJson }}"{% endif %}>
+        <svg class="formable-success__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 10.2l2.6 2.6L14.2 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="formable-success__content">
+            <h{{ headingLevel }} class="formable-success__heading">{{ successMessage }}</h{{ headingLevel }}>
+            {% if successDetails %}
+                <p class="formable-success__details">{{ successDetails }}</p>
+            {% endif %}
+            {# The blank form this same render already puts below is the
+               non-JS path's "way back" - this link exists for the AJAX path,
+               which replaces the form outright, but is shown here too so the
+               two paths read the same and it's an explicit affordance rather
+               than something the submitter has to notice on their own. A full
+               navigation (not JS) so it always arrives with a clean CSRF
+               token and honeypot timestamp. #}
+            <a class="formable-success__restart" href="{{ craft.app.request.url }}">{{ 'Submit another response'|t('formable') }}</a>
+        </div>
+    </div>
+{% endif %}
+
+{% if not accepting %}
+    {{ include(craft.formable.template('_closed', templatePath), {
+        form: form,
+        settings: settings,
+        message: closedMessage,
+    }, with_context = false) }}
+    <div hidden>
+{% else %}
+    <form id="{{ formId }}"
+        class="formable-form{{ densityClass }}{{ labelPositionClass }}{{ appearanceClass }}{{ radiusClass }}{{ buttonStyleClass }}{{ cssClass }} {{ options.class ?? '' }}"
+        method="post"
+        accept-charset="UTF-8"
+        novalidate
+        data-formable-handle="{{ form.handle }}"
+        data-formable-method="{{ settings.submitMethod }}"
+        data-formable-success-behavior="{{ settings.successBehavior }}"
+        data-formable-error-message="{{ errorMessage }}"
+        data-formable-scheme="{{ colorScheme }}"
+        {%- if paletteHash %} data-formable-palette="{{ paletteHash }}" data-formable-palette-vars="{{ paletteVarsJson }}"{% endif %}
+        {%- if hasFileUploads %} enctype="multipart/form-data"{% endif %}>
+
+        {{ csrfInput() }}
+        {{ actionInput('formable/submissions/submit') }}
+        <input type="hidden" name="handle" value="{{ form.handle }}">
+
+        {# Identifies this pass through the form. Sits outside the swappable step so
+           it rides every AJAX page navigation, keeping a second tab's answers in
+           their own session slot rather than interleaved with this one's. #}
+        {% if flowId %}<input type="hidden" name="formableFlow" value="{{ flowId }}">{% endif %}
+
+        {% if isShell %}
+            {# What `_step.twig:37` normally supplies - out of reach here, since
+               the shell never includes `_step`. `SubmissionsController.php:321`
+               reads this same name regardless of which path minted it. #}
+            <input type="hidden" name="pageIndex" value="0">
+        {% endif %}
+
+        {# The honeypot and timing/JS fields sit outside the swappable step so they
+           survive AJAX page navigation - the timestamp is minted once, at render. #}
+        {{ include(craft.formable.template('_spam', templatePath), {
+            spam: spam ?? null,
+            formId: formId,
+        }, with_context = false) }}
+
+        {% if hasErrors %}
+            {# No `role="alert"`: the summary is in the markup at page load, and an
+               alert region is only announced when content is inserted or changes,
+               never for what was already there. `main.ts`'s `init()` focuses this
+               element instead (its `tabindex="-1"` is for that), which is what
+               actually reaches a screen reader on the page-reload error path. The
+               empty `{% else %}` placeholder below carries no role either - the
+               AJAX path fills it live and then focuses it the same way, so the
+               role would only announce what focus already announces (0064). #}
+            <div class="formable-form__errors" id="{{ messageId }}" tabindex="-1"
+                data-formable-error-summary>
+                <p class="formable-form__errors-message">{{ errorMessage }}</p>
+                {% if fieldsByHandle|length %}
+                    {# The route to each failing field. `handleErrors()` in
+                       `main.ts` builds this same list, from the same handles, over
+                       the AJAX path - see the fieldsByHandle comment above. #}
+                    <ul class="formable-form__errors-list">
+                        {% for handle in errors|keys %}
+                            {% set field = fieldsByHandle[handle] ?? null %}
+                            {% if field %}
+                                {# Matches whatever id this render actually gave the
+                                   field's control - `fieldIdPrefix` is `form.twig`'s
+                                   `{formId}-field-` or the shell's bare-id "formable-",
+                                   `_field.twig`'s own default absent a threaded `formId`. #}
+                                <li><a href="#{{ fieldIdPrefix }}{{ field.id }}">{{ field.label }}</a></li>
+                            {% endif %}
+                        {% endfor %}
+                    </ul>
+                {% endif %}
+            </div>
+        {% else %}
+            {# Present but empty, so the AJAX path has somewhere to put the summary
+               without having to build (and place) the elements itself. #}
+            <div class="formable-form__errors" id="{{ messageId }}" tabindex="-1" hidden
+                data-formable-error-summary>
+                <p class="formable-form__errors-message"></p>
+            </div>
+        {% endif %}
+{% endif %}

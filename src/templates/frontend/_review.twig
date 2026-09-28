@@ -1,0 +1,66 @@
+{#
+ # The review step: a read-only summary of every answer, before the final
+ # submit.
+ #
+ # Only the fields the submitter was actually shown appear - a field hidden by
+ # conditional logic isn't part of what they're confirming. Each page keeps an
+ # "edit" link back to itself so a wrong answer is one click from being fixed.
+ #
+ # Variables:
+ #   form, pages, submission, settings, values, templatePath
+ #   headingLevel  heading level the review heading renders at (see `form.twig`);
+ #                 each page's own sub-heading below renders one level lower.
+ #}
+{% set fieldValues = submission.getValues() %}
+{% set visibility = craft.formable.visibleFields(form, fieldValues) %}
+{% set headingLevel = headingLevel ?? 2 %}
+{% set pageHeadingLevel = min(headingLevel + 1, 6) %}
+
+<div class="formable-review" data-formable-review>
+    <h{{ headingLevel }} class="formable-review__heading">{{ settings.reviewPageLabel }}</h{{ headingLevel }}>
+
+    {% for pageIndex, page in pages %}
+        {% set pageFields = [] %}
+        {% for row in page.rows ?? [] %}
+            {% for field in row.fields %}
+                {% if field.hasValue and (visibility[field.handle] ?? true) %}
+                    {% set pageFields = pageFields|merge([field]) %}
+                {% endif %}
+            {% endfor %}
+        {% endfor %}
+
+        {% if pageFields|length %}
+            <section class="formable-review__page">
+                <div class="formable-review__page-header">
+                    {% if page.label %}
+                        <h{{ pageHeadingLevel }} class="formable-review__page-label">{{ page.label }}</h{{ pageHeadingLevel }}>
+                    {% endif %}
+                    {# Jumps straight to this page. The button names the target
+                       through `formableGoto`, which the server treats as a
+                       back-style move: progress saved, nothing validated on the
+                       way. #}
+                    <button type="submit"
+                        class="formable-button formable-button--ghost formable-button--sm formable-button--edit"
+                        name="formableGoto"
+                        value="{{ pageIndex }}"
+                        formnovalidate
+                        data-formable-edit="{{ pageIndex }}">
+                        {{ 'Edit'|t('formable') }}
+                    </button>
+                </div>
+
+                <dl class="formable-review__answers">
+                    {% for field in pageFields %}
+                        <div class="formable-review__answer">
+                            <dt class="formable-review__question">{{ field.label }}</dt>
+                            <dd class="formable-review__value">
+                                {% set display = field.valueToString(fieldValues[field.handle] ?? null) %}
+                                {{ display != '' ? display : '-' }}
+                            </dd>
+                        </div>
+                    {% endfor %}
+                </dl>
+            </section>
+        {% endif %}
+    {% endfor %}
+</div>

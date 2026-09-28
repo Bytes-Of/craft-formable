@@ -1,0 +1,51 @@
+{% extends '_layouts/cp' %}
+
+{% set title = 'Submission statuses'|t('formable') %}
+
+{% set crumbs = [
+    { label: 'Formable'|t('formable'), url: cpUrl('formable') },
+] %}
+
+{% do view.registerAssetBundle('craft\\web\\assets\\admintable\\AdminTableAsset') %}
+
+{% block actionButton %}
+    <a href="{{ cpUrl('formable/statuses/new') }}" class="btn submit add icon">{{ 'New status'|t('formable') }}</a>
+{% endblock %}
+
+{% block content %}
+    <p class="light">
+        {{ 'Statuses are the workflow a submission moves through. They are stored in your project config, so what you set up here deploys with the rest of your configuration.'|t('formable') }}
+    </p>
+
+    <div id="formable-statuses"></div>
+{% endblock %}
+
+{% set tableData = [] %}
+{% for status in statuses %}
+    {% set tableData = tableData|merge([{
+        id: status.id,
+        title: status.name,
+        url: cpUrl('formable/statuses/' ~ status.id),
+        name: status.name|e,
+        handle: status.handle,
+        color: '<span class="status ' ~ status.color|e('html_attr') ~ '"></span>' ~ status.color|e,
+        default: status.isDefault ? '<span data-icon="check" role="img" aria-label="' ~ 'Default'|t('formable')|e('html_attr') ~ '"></span>' : '',
+    }]) %}
+{% endfor %}
+
+{% js %}
+    new Craft.VueAdminTable({
+        columns: [
+            { name: '__slot:title', title: {{ 'Name'|t('formable')|json_encode|raw }} },
+            { name: '__slot:handle', title: {{ 'Handle'|t('formable')|json_encode|raw }} },
+            { name: 'color', title: {{ 'Color'|t('formable')|json_encode|raw }} },
+            { name: 'default', title: {{ 'Default'|t('formable')|json_encode|raw }} },
+        ],
+        container: '#formable-statuses',
+        emptyMessage: {{ 'No submission statuses yet.'|t('formable')|json_encode|raw }},
+        tableData: {{ tableData|json_encode|raw }},
+        deleteAction: 'formable/statuses/delete',
+        deleteConfirmationMessage: {{ 'Delete this status? Submissions sitting in it move to the default status.'|t('formable')|json_encode|raw }},
+        reorderAction: {{ (statuses|length > 1 ? 'formable/statuses/reorder' : '')|json_encode|raw }},
+    });
+{% endjs %}

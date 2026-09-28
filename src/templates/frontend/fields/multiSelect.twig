@@ -1,0 +1,29 @@
+{% set selected = value ?? field.defaultValue %}
+{# `multi-select.ts` replaces the native listbox below with a searchable
+ # combobox and a row of removable chips, keeping the `<select>` as the thing
+ # that actually posts - every chip toggle is mirrored onto its `option.selected`
+ # flags. Without JavaScript, or if there are too few options to bother
+ # enhancing, this renders exactly as it always has: a plain `size`-rowed
+ # listbox. `__LABEL__`/`__QUERY__` are placeholders the enhancer substitutes,
+ # the same pattern `fileUpload.twig` uses for `__NAME__`. #}
+<div class="formable-multiselect" data-formable-multiselect
+    data-formable-ms-search-label="{{ 'Search options'|t('formable')|e('html_attr') }}"
+    data-formable-ms-empty-label="{{ 'No options match “{query}”'|t('formable', { query: '__QUERY__' })|e('html_attr') }}"
+    data-formable-ms-remove-label="{{ 'Remove {label}'|t('formable', { label: '__LABEL__' })|e('html_attr') }}"
+    data-formable-ms-added-label="{{ 'Added {label}'|t('formable', { label: '__LABEL__' })|e('html_attr') }}"
+    data-formable-ms-removed-label="{{ 'Removed {label}'|t('formable', { label: '__LABEL__' })|e('html_attr') }}">
+    <select id="{{ inputId }}"
+        name="{{ inputName }}[]"
+        class="formable-input formable-input--multiselect"
+        multiple
+        size="{{ field.size }}"
+        {%- if field.required %} required{% endif %}
+        {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+        {%- if hasErrors %} aria-invalid="true"{% endif %}>
+        {% for option in field.options %}
+            <option value="{{ option.value }}"
+                {%- if option.value in selected %} selected{% endif %}
+                {%- if option.isDisabled %} disabled{% endif %}>{{ option.label }}</option>
+        {% endfor %}
+    </select>
+</div>

@@ -1,0 +1,18 @@
+{% set selected = value ?? field.defaultValue %}
+<div class="formable-options formable-options--{{ field.layout }}">
+    {% for option in field.options %}
+        {% set optionId = "#{inputId}-#{loop.index}" %}
+        <div class="formable-option">
+            <input type="radio"
+                id="{{ optionId }}"
+                name="{{ inputName }}"
+                value="{{ option.value }}"
+                class="formable-input formable-input--radio"
+                {%- if option.value == selected %} checked{% endif %}
+                {%- if option.isDisabled %} disabled{% endif %}
+                {%- if field.required %} required{% endif %}
+                {%- if hasErrors %} aria-invalid="true"{% endif %}>
+            <label class="formable-option__label" for="{{ optionId }}">{{ option.label }}</label>
+        </div>
+    {% endfor %}
+</div>

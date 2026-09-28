@@ -1,0 +1,22 @@
+{% import '_includes/forms' as forms %}
+
+{{ forms.selectField({
+    label: 'Form'|t('formable'),
+    instructions: 'Limit the widget to one form, or show submissions across all of them.'|t('formable'),
+    id: 'formId',
+    name: 'formId',
+    options: formOptions,
+    value: widget.formId,
+}) }}
+
+{{ forms.textField({
+    label: 'Limit'|t('formable'),
+    instructions: 'How many recent submissions to list.'|t('formable'),
+    id: 'limit',
+    name: 'limit',
+    type: 'number',
+    size: 3,
+    min: 1,
+    max: 50,
+    value: widget.limit,
+}) }}

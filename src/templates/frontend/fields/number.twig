@@ -1,0 +1,12 @@
+<input type="number"
+    id="{{ inputId }}"
+    name="{{ inputName }}"
+    class="formable-input formable-input--number"
+    value="{{ value ?? field.defaultValue }}"
+    {%- if field.placeholder %} placeholder="{{ field.placeholder }}"{% endif %}
+    {%- if field.min is not null %} min="{{ field.min }}"{% endif %}
+    {%- if field.max is not null %} max="{{ field.max }}"{% endif %}
+    step="{{ field.step }}"
+    {%- if field.required %} required{% endif %}
+    {%- if describedBy %} aria-describedby="{{ describedBy }}"{% endif %}
+    {%- if hasErrors %} aria-invalid="true"{% endif %}>
