@@ -59,6 +59,10 @@ Common arguments: `id`, `uid`, `handle`, `status`, `limit`, `offset`.
 - `formableSubmission` - a single submission.
 - `formableSubmissionCount` - a count.
 
+All three answer with completed submissions that aren't flagged as spam, even
+when you name the ones you want by `id` or `uid`. Pass `isSpam: true` for the
+spam queue, or `isIncomplete: true` for submissions saved to be finished later.
+
 Each submission carries the site it was made from, as `submittedSiteId` and
 `submittedSiteHandle`, and the list can be narrowed to it:
 

@@ -82,15 +82,19 @@
            as a plain field's `<input id>`) - without `tabindex` a fragment
            link to a non-interactive element like `<fieldset>` scrolls it into
            view but leaves keyboard focus on the document, same problem
-           `swapStep()` in main.ts solves for the step heading. #}
+           `swapStep()` in main.ts solves for the step heading.
+
+           ARIA doesn't allow `aria-required` on a group, and checkboxes,
+           ratings and tables have no native `required` to fall back on, so
+           the legend says "required" in words. A screen reader reads the
+           legend on entering the group, whatever controls are inside it. #}
         <fieldset class="formable-field__fieldset"
             id="{{ inputId }}"
             tabindex="-1"
-            {%- if field.required %} aria-required="true"{% endif %}
             {%- if describedBy %} aria-describedby="{{ describedBy|join(' ') }}"{% endif %}>
             <legend class="formable-field__legend{% if field.labelHidden %} formable-visually-hidden{% endif %}">
                 {{ field.label }}
-                {%- if field.required %} <span class="formable-field__required" aria-hidden="true">*</span>{% endif %}
+                {%- if field.required %} <span class="formable-field__required" aria-hidden="true">*</span><span class="formable-visually-hidden">{{ 'required'|t('formable') }}</span>{% endif %}
             </legend>
             {%- if field.instructions %}
             <div class="formable-field__instructions" id="{{ instructionsId }}">{{ field.instructions }}</div>

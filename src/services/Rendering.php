@@ -12,6 +12,7 @@ use bytesof\formable\models\FieldMap;
 use bytesof\formable\models\FormSettings;
 use bytesof\formable\models\FormShell;
 use bytesof\formable\models\Palette;
+use bytesof\formable\models\ResolvedFlow;
 use bytesof\formable\models\Settings;
 use bytesof\formable\Plugin;
 use bytesof\formable\web\assets\frontend\ContractAsset;
@@ -19,6 +20,7 @@ use bytesof\formable\web\assets\frontend\FrontendAsset;
 use bytesof\formable\web\assets\frontend\ResetAsset;
 use bytesof\formable\web\assets\frontend\ThemeAsset;
 use Craft;
+use craft\helpers\UrlHelper;
 use craft\web\View;
 use Throwable;
 use Twig\Extension\SandboxExtension;
@@ -57,6 +59,13 @@ final class Rendering extends Component
      * that one is read as a plain string in more than one place.
      */
     public const SUCCESS_DETAILS_FLASH_PREFIX = 'formable:successDetails:';
+
+    /**
+     * Session flash key for the confirmation of a non-AJAX save for later,
+     * suffixed with the form handle for the same reason as
+     * {@see SUCCESS_FLASH_PREFIX}.
+     */
+    public const SAVED_FLASH_PREFIX = 'formable:saved:';
 
     /**
      * Failure mode for {@see renderObjectString()}: a string that could not be
@@ -144,7 +153,8 @@ final class Rendering extends Component
         // both the shell's hidden input and the progress lookup have to name
         // the same flow, or a page reload can't find where the last one left
         // off.
-        $flowId = $this->resolveFlowId($form, $options);
+        $flow = $this->resolveFlow($form, $options);
+        $flowId = $flow->id;
         $options['flowId'] = $flowId;
 
         $submission = $this->resolveSubmission($form, $options);
@@ -154,7 +164,7 @@ final class Rendering extends Component
         }
 
         $pages = $this->preparePages($form);
-        $flow = Plugin::getInstance()->getPageFlow();
+        $pageFlow = Plugin::getInstance()->getPageFlow();
 
         $currentPage = $this->resolveCurrentPage($form, $submission, $options);
         $isReview = $this->resolveReview($form, $submission, $currentPage, $options);
@@ -175,21 +185,25 @@ final class Rendering extends Component
             'errorMessage' => $this->renderMessage($settings->errorMessage, $submission),
             'errors' => $submission->getAllFieldErrors(),
             'values' => $submission->getValues(),
-            'successMessage' => $this->getSuccessMessage($form),
-            'successDetails' => $this->getSuccessDetails($form),
+            'successMessage' => $this->formFlash($form, self::SUCCESS_FLASH_PREFIX),
+            'successDetails' => $this->formFlash($form, self::SUCCESS_DETAILS_FLASH_PREFIX),
+            'savedMessage' => $this->formFlash($form, self::SAVED_FLASH_PREFIX),
             'hasFileUploads' => $this->hasFileUploads($pages),
             'currentPage' => $currentPage,
             'isReview' => $isReview,
             'flowId' => $flowId,
-            'sequence' => $flow->getPageSequence($submission),
-            'progress' => $flow->getProgressPosition($submission, $currentPage),
-            'isLastPage' => $flow->isLastPage($submission, $currentPage),
+            'flowIsFresh' => $flow->isFresh,
+            'tokensUrl' => $this->tokensUrl(),
+            'sequence' => $pageFlow->getPageSequence($submission),
+            'progress' => $pageFlow->getProgressPosition($submission, $currentPage),
+            'isLastPage' => $pageFlow->isLastPage($submission, $currentPage),
             'spam' => Plugin::getInstance()->getSpam()->getFrontEndConfig($form),
             'colorScheme' => $this->resolveColorScheme($form, $options['colorScheme'] ?? null),
             'palette' => $palette,
             'paletteHash' => $paletteDeclarations !== [] ? $this->paletteHash($paletteDeclarations) : null,
             'paletteVarsJson' => $paletteDeclarations !== [] ? json_encode($paletteDeclarations, JSON_THROW_ON_ERROR) : null,
             'headingLevel' => $this->resolveHeadingLevel($options),
+            'restartUrl' => $this->resolveRestartUrl($options),
             'options' => $options,
         ], $options);
 
@@ -220,7 +234,8 @@ final class Rendering extends Component
 
         $accepting = $form->isAcceptingSubmissions();
 
-        $flowId = $this->resolveFlowId($form, $options);
+        $flow = $this->resolveFlow($form, $options);
+        $flowId = $flow->id;
         $options['flowId'] = $flowId;
 
         $formId = $options['id'] ?? "formable-form-{$form->handle}-{$flowId}";
@@ -261,8 +276,11 @@ final class Rendering extends Component
             'form' => $form,
             'options' => $options,
             'flowId' => $flowId,
+            'flowIsFresh' => $flow->isFresh,
+            'tokensUrl' => $this->tokensUrl(),
             'formId' => $formId,
             'headingLevel' => $this->resolveHeadingLevel($options),
+            'restartUrl' => $this->resolveRestartUrl($options),
             'settings' => $settings,
             'errorMessage' => $this->renderMessage($settings->errorMessage, $submission),
             'errors' => $errors,
@@ -272,8 +290,9 @@ final class Rendering extends Component
             // this is what makes the shell's summary anchors match it with
             // no formId threaded through by the author.
             'fieldIdPrefix' => 'formable-',
-            'successMessage' => $this->getSuccessMessage($form),
-            'successDetails' => $this->getSuccessDetails($form),
+            'successMessage' => $this->formFlash($form, self::SUCCESS_FLASH_PREFIX),
+            'successDetails' => $this->formFlash($form, self::SUCCESS_DETAILS_FLASH_PREFIX),
+            'savedMessage' => $this->formFlash($form, self::SAVED_FLASH_PREFIX),
             'colorScheme' => $this->resolveColorScheme($form, $options['colorScheme'] ?? null),
             'palette' => $palette,
             'paletteHash' => $paletteDeclarations !== [] ? $this->paletteHash($paletteDeclarations) : null,
@@ -356,7 +375,23 @@ final class Rendering extends Component
      */
     public function renderMessage(string $template, Form|Submission $object): string
     {
-        return $this->renderObjectString($template, $object, what: 'message');
+        return $this->renderObjectString($template, $object, what: 'message', variables: $this->elementVariables($object));
+    }
+
+    /**
+     * The element a settings string is rendered against, under the name an
+     * author writes it by - `{{ submission.id }}`, as the settings screen's
+     * own examples do. A bare object template only binds it as `object`, so
+     * without this those examples rendered blank. The names match the ones a
+     * notification already gets.
+     *
+     * @return array<string, Form|Submission|null>
+     */
+    private function elementVariables(Form|Submission $object): array
+    {
+        return $object instanceof Submission
+            ? ['submission' => $object, 'form' => $object->getForm()]
+            : ['form' => $object];
     }
 
     /**
@@ -375,7 +410,8 @@ final class Rendering extends Component
             $submission,
             self::ON_ERROR_EMPTY,
             'redirect URL',
-            context: self::CONTEXT_URL,
+            $this->elementVariables($submission),
+            self::CONTEXT_URL,
         );
 
         return $url !== '' ? $url : null;
@@ -563,8 +599,8 @@ final class Rendering extends Component
             'spam' => ['captcha' => Plugin::getInstance()->getCaptchas()->getCaptchaForForm($form)?->getFrontEndData()],
             // `_step.twig` builds its own `formId` the same way `form.twig`
             // does, so the page/field ids this AJAX swap mints stay namespaced
-            // the same way the initial render's did - see resolveFlowId().
-            'flowId' => $this->resolveFlowId($form, $options),
+            // the same way the initial render's did - see resolveFlow().
+            'flowId' => $this->resolveFlow($form, $options)->id,
             'headingLevel' => $this->resolveHeadingLevel($options),
             'options' => $options,
         ], $options);
@@ -1036,16 +1072,36 @@ final class Rendering extends Component
      *
      * @param array<string, mixed> $options
      */
-    private function resolveFlowId(Form $form, array $options): string
+    private function resolveFlow(Form $form, array $options): ResolvedFlow
     {
         $pinned = $options['flowId'] ?? null;
 
         if (is_string($pinned) && $pinned !== '') {
-            return $pinned;
+            return new ResolvedFlow($pinned, false);
         }
 
-        return $this->flowIdFromRequest($form)
-            ?? Plugin::getInstance()->getProgress()->newFlowId();
+        $fromRequest = $this->flowIdFromRequest($form);
+
+        if ($fromRequest !== null) {
+            return new ResolvedFlow($fromRequest, false);
+        }
+
+        return new ResolvedFlow(Plugin::getInstance()->getProgress()->newFlowId(), true);
+    }
+
+    /**
+     * Where the front-end bundle fetches fresh request-scoped tokens from, or
+     * null when the site has switched the refresh off. The template emits the
+     * attribute only when this is set, so the switch lives on the server and
+     * the bundle never has to know about it.
+     */
+    private function tokensUrl(): ?string
+    {
+        if (!Plugin::getInstance()->getSettings()->refreshCachedTokens) {
+            return null;
+        }
+
+        return UrlHelper::actionUrl('formable/submissions/tokens');
     }
 
     /**
@@ -1139,10 +1195,10 @@ final class Rendering extends Component
     }
 
     /**
-     * The success message flashed by the last non-AJAX submit of this form, if
-     * the current request is the redirect that followed it.
+     * What the last non-AJAX post of this form flashed under `$prefix`, if the
+     * current request is the redirect that followed it.
      */
-    private function getSuccessMessage(Form $form): ?string
+    private function formFlash(Form $form, string $prefix): ?string
     {
         // No session on a console request (a form rendered by a queue job for
         // an email preview, say), and no flash to read either.
@@ -1150,25 +1206,36 @@ final class Rendering extends Component
             return null;
         }
 
-        $message = Craft::$app->getSession()->getFlash(self::SUCCESS_FLASH_PREFIX . $form->handle);
+        $message = Craft::$app->getSession()->getFlash($prefix . $form->handle);
 
         return is_string($message) && $message !== '' ? $message : null;
     }
 
     /**
-     * The success-details flashed by the last non-AJAX submit of this form, if
-     * the current request is the redirect that followed it. Mirrors
-     * {@see getSuccessMessage()}; null both when there's nothing flashed and
-     * when the form's {@see FormSettings::$successDetails} was left empty.
+     * Where the success state's "Submit another response" link goes, or null
+     * for no link at all.
+     *
+     * The default is the URL the form was rendered on: requesting it again
+     * re-renders the same embed with a blank form, and arriving by a full
+     * navigation brings a fresh CSRF token and honeypot timestamp with it.
+     *
+     * A template that renders a form on a single-use URL has to say so,
+     * because the plugin has no way to tell: `_resume` passes
+     * `restartUrl: false`, since by the time the success state renders there
+     * the resume token in the URL has been spent and the link would 404.
+     *
+     * @param array<string, mixed> $options
      */
-    private function getSuccessDetails(Form $form): ?string
+    private function resolveRestartUrl(array $options): ?string
     {
-        if ($form->handle === null || Craft::$app->getRequest()->getIsConsoleRequest()) {
-            return null;
+        if (array_key_exists('restartUrl', $options)) {
+            $url = $options['restartUrl'];
+
+            return is_string($url) && $url !== '' ? $url : null;
         }
 
-        $details = Craft::$app->getSession()->getFlash(self::SUCCESS_DETAILS_FLASH_PREFIX . $form->handle);
+        $request = Craft::$app->getRequest();
 
-        return is_string($details) && $details !== '' ? $details : null;
+        return $request->getIsConsoleRequest() ? null : $request->getUrl();
     }
 }

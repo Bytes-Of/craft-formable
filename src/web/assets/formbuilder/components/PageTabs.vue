@@ -107,7 +107,8 @@ function pageControl(
 
 function move(index: number, direction: -1 | 1): void {
   const pageId = store.form.pages[index]?.id;
-  const label = direction === -1 ? t('Move left') : t('Move right');
+  const label =
+    direction === -1 ? t('Move page earlier') : t('Move page later');
 
   store.movePage(index, index + direction);
 
@@ -171,19 +172,19 @@ function move(index: number, direction: -1 | 1): void {
             type="button"
             class="fb-pages__control"
             :aria-disabled="index === 0"
-            :aria-label="t('Move left')"
+            :aria-label="t('Move page earlier')"
             @click="move(index, -1)"
           >
-            ←
+            <span class="fb-pages__arrow" aria-hidden="true">←</span>
           </button>
           <button
             type="button"
             class="fb-pages__control"
             :aria-disabled="index === store.form.pages.length - 1"
-            :aria-label="t('Move right')"
+            :aria-label="t('Move page later')"
             @click="move(index, 1)"
           >
-            →
+            <span class="fb-pages__arrow" aria-hidden="true">→</span>
           </button>
           <button
             type="button"

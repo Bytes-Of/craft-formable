@@ -15,8 +15,21 @@
  #                   id, `options.class` for extra classes on the `<form>`
  #   flowId          identifies this pass through the form (per-tab progress
  #                   slot) - also the `formableFlow` hidden input's value
+ #   flowIsFresh     whether `flowId` was minted for this render, with no progress
+ #                   stored under it - the only case a cached page may swap it
+ #   tokensUrl       the endpoint that mints fresh CSRF/time/flow tokens for a
+ #                   statically cached page, or null when the refresh is off
  #   formId          this render's unique form id (see `form.twig`)
  #   headingLevel    heading level the success heading starts from (default 2)
+ #   restartUrl      where the success state's "Submit another response" link
+ #                   goes, or null for no link - see
+ #                   {@see \bytesof\formable\services\Rendering::resolveRestartUrl()}.
+ #                   Also emitted as `data-formable-restart`, which is where
+ #                   `buildSuccessNotice()` in `main.ts` reads it for the AJAX
+ #                   path's own notice. That attribute is always written, empty
+ #                   value included: an empty one tells the client this render
+ #                   has no URL to go back to, where a missing attribute means
+ #                   an override template that predates it
  #   settings        FormSettings, already localized to the current site
  #                   ({@see \bytesof\formable\services\Translations::localizeSettings()})
  #   errorMessage    settings.errorMessage, rendered (it may carry author Twig) -
@@ -33,6 +46,7 @@
  #                   their bare id (decision 0068)
  #   successMessage  flashed message from a completed non-JS submit, or null
  #   successDetails  settings.getSuccessDetails(), rendered, or null
+ #   savedMessage    flashed confirmation from a non-JS save for later, or null
  #   colorScheme     resolved light | dark | auto, emitted as data-formable-scheme
  #   palette         resolved Palette - radius/buttonStyle always carry a concrete value
  #   paletteHash     key for the registered palette CSS block, or null when nothing is set
@@ -89,11 +103,32 @@
                two paths read the same and it's an explicit affordance rather
                than something the submitter has to notice on their own. A full
                navigation (not JS) so it always arrives with a clean CSRF
-               token and honeypot timestamp. #}
-            <a class="formable-success__restart" href="{{ craft.app.request.url }}">{{ 'Submit another response'|t('formable') }}</a>
+               token and honeypot timestamp. Left out entirely when the render
+               has no URL that re-serves the form, as on the resume page. #}
+            {% if restartUrl ?? null %}
+                <a class="formable-success__restart" href="{{ restartUrl }}">{{ 'Submit another response'|t('formable') }}</a>
+            {% endif %}
         </div>
     </div>
 {% endif %}
+
+{% if savedMessage ?? null %}
+    {# `handleSaved()` builds this same notice in place of the form. Here the
+       form stays below it, at the step that was saved: the reload has no
+       other way back to it, and the visitor may yet finish in this tab. #}
+    <div class="formable-success" id="{{ successId }}" role="status" tabindex="-1"
+        data-formable-success
+        data-formable-scheme="{{ colorScheme }}"
+        {%- if paletteHash %} data-formable-palette="{{ paletteHash }}" data-formable-palette-vars="{{ paletteVarsJson }}"{% endif %}>
+        <svg class="formable-success__icon" viewBox="0 0 20 20" fill="none" aria-hidden="true" focusable="false">
+            <circle cx="10" cy="10" r="8.5" stroke="currentColor" stroke-width="1.5"/>
+            <path d="M6 10.2l2.6 2.6L14.2 7" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="formable-success__content">
+            <h{{ headingLevel }} class="formable-success__heading">{{ savedMessage }}</h{{ headingLevel }}>
+        </div>
+    </div>
+{% endif -%}
 
 {% if not accepting %}
     {{ include(craft.formable.template('_closed', templatePath), {
@@ -113,6 +148,8 @@
         data-formable-success-behavior="{{ settings.successBehavior }}"
         data-formable-error-message="{{ errorMessage }}"
         data-formable-scheme="{{ colorScheme }}"
+        data-formable-restart="{{ restartUrl ?? '' }}"
+        {%- if tokensUrl ?? null %} data-formable-tokens="{{ tokensUrl }}"{% endif %}
         {%- if paletteHash %} data-formable-palette="{{ paletteHash }}" data-formable-palette-vars="{{ paletteVarsJson }}"{% endif %}
         {%- if hasFileUploads %} enctype="multipart/form-data"{% endif %}>
 
@@ -122,8 +159,14 @@
 
         {# Identifies this pass through the form. Sits outside the swappable step so
            it rides every AJAX page navigation, keeping a second tab's answers in
-           their own session slot rather than interleaved with this one's. #}
-        {% if flowId %}<input type="hidden" name="formableFlow" value="{{ flowId }}">{% endif %}
+           their own session slot rather than interleaved with this one's.
+
+           `data-formable-flow` is the marker that a cached copy of this page may
+           have the id replaced with a per-visitor one. It is left off when the id
+           was pinned or carried in by the request, because a stored incomplete
+           submission may already be bound to it and swapping it would orphan
+           that progress. #}
+        {% if flowId %}<input type="hidden" name="formableFlow" value="{{ flowId }}"{% if flowIsFresh ?? false %} data-formable-flow{% endif %}>{% endif %}
 
         {% if isShell %}
             {# What `_step.twig:37` normally supplies - out of reach here, since

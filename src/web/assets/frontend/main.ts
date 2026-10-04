@@ -26,6 +26,7 @@ import { scrollBehavior } from './scroll';
 import { enhanceSignatures } from './signature';
 import { renderStyleVars } from './style-vars';
 import { enhanceTables } from './table';
+import { refreshTokens } from './tokens';
 import { InlineValidation } from './validation-dom';
 
 // Registered once, at module load. Anything that makes a field's markup
@@ -472,6 +473,13 @@ export class FormableForm {
     const success = FormableForm.buildSuccessNotice(result.message ?? '', {
       details: result.successDetails,
       restartLabel: result.restartLabel,
+      // The URL the server says re-serves this form, which is not always the
+      // one in the address bar: a resume link is spent once it's been
+      // followed, so that render sends an empty value and gets no link.
+      // Absent on an override template that predates the attribute - fall
+      // back to the old behaviour there.
+      restartUrl:
+        this.formElement.dataset.formableRestart ?? window.location.href,
     });
 
     // Replacing the form (rather than just prepending a message) keeps a
@@ -488,16 +496,22 @@ export class FormableForm {
    * `form.twig`'s `successMessage` markup exactly. The message is the
    * heading: it's already the one line of copy this state always has, so
    * there's no second, generic "Success!" string to keep in step with the
-   * server-rendered path. `details` and `restartLabel` are only ever passed
-   * by `handleSuccess()` - a save isn't a completion, so `handleSaved()`
-   * leaves them unset and "submit another response" never shows for it.
+   * server-rendered path. `details`, `restartLabel` and `restartUrl` are only
+   * ever passed by `handleSuccess()` - a save isn't a completion, so
+   * `handleSaved()` leaves them unset and "submit another response" never
+   * shows for it.
    */
   private static buildSuccessNotice(
     message: string,
     {
       details,
       restartLabel,
-    }: { details?: string | null; restartLabel?: string | null } = {},
+      restartUrl,
+    }: {
+      details?: string | null;
+      restartLabel?: string | null;
+      restartUrl?: string | null;
+    } = {},
   ): HTMLElement {
     const notice = document.createElement('div');
     notice.className = 'formable-success';
@@ -527,13 +541,13 @@ export class FormableForm {
       content.appendChild(detailsEl);
     }
 
-    if (restartLabel) {
+    if (restartLabel && restartUrl) {
       // A full navigation, not a DOM rebuild - the same reasoning as the
-      // server-rendered restart link in `form.twig`: it always arrives with
-      // a clean CSRF token and honeypot timestamp.
+      // server-rendered restart link in `_shellOpen.twig`: it always arrives
+      // with a clean CSRF token and honeypot timestamp.
       const restart = document.createElement('a');
       restart.className = 'formable-success__restart';
-      restart.href = window.location.href;
+      restart.href = restartUrl;
       restart.textContent = restartLabel;
       content.appendChild(restart);
     }
@@ -815,13 +829,19 @@ declare global {
  * inserted subtree keeps the scan scoped to what actually changed.
  */
 function initForms(root: ParentNode = document): void {
-  root
-    .querySelectorAll<HTMLFormElement>(
+  const forms = Array.from(
+    root.querySelectorAll<HTMLFormElement>(
       'form[data-formable-handle]:not([data-formable-enhanced])',
-    )
-    .forEach((form) => {
-      new FormableForm(form);
-    });
+    ),
+  );
+
+  forms.forEach((form) => {
+    new FormableForm(form);
+  });
+
+  if (forms.length > 0) {
+    void refreshTokens(forms);
+  }
 }
 
 // The bundle is deferred, so the document may already be parsed by the time

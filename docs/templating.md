@@ -29,6 +29,7 @@ The `craft.formable` Twig variable is the front-end entry point.
 | `id`             | unique per render (`renderForm` only) | The `<form>` element's id. See [Accessibility](#accessibility) below if you render the same form more than once on a page. |
 | `class`          | none                               | An extra class (or space-separated list) added to the `<form>` element, alongside the form's own presentation classes. |
 | `headingLevel`   | `2`                                | The heading level (`1`-`6`) the page label, review and success headings render at. Set it to match where the form sits in your page's own heading outline - see [Embedding](theming.md#embedding). |
+| `restartUrl`     | the URL the form is rendered on (`renderForm` and `renderFormShell`) | Where the success message's "Submit another response" link goes. Set it to `false` to drop the link, on a page whose own URL won't serve the form a second time - a one-time token in the query string, say. The bundled `_resume.twig` already does this. |
 
 ### Laying out fields by hand
 
@@ -79,7 +80,7 @@ top-level partials assemble a form:
 | `_review.twig`                  | The optional review-before-submit page                         |
 | `_captcha.twig`                 | The captcha widget (Pro)                                       |
 | `_spam.twig`                    | The honeypot / JS spam fields                                  |
-| `_resume.twig`                  | The save-and-resume prompt (Pro)                               |
+| `_resume.twig`                  | The page a save-and-resume link opens (Pro). Its `submission` is null once the form is finished without JavaScript, when it shows the success message instead |
 | `_closed.twig`                  | Shown in place of the form when it isn't accepting submissions |
 
 Per-field markup lives under
@@ -282,59 +283,97 @@ form's `data-formable-error-message` attribute - the form's own configured
 
 ## Caching forms
 
-Every rendered form - single-page or multi-page - includes a `csrfInput()`
-token, and that token is minted _when the markup is rendered_. If the page
-holding the form is cached - Craft's `{% cache %}` tag,
+A rendered form bakes three values into its markup that belong to one request:
+
+- **The CSRF token** from `csrfInput()`. Craft checks it against the visitor's
+  own session, so a token cached for someone else is a 400 on every submit.
+- **A signed time token**, when the form has a minimum submit time. It records
+  when the markup was rendered.
+- **The flow id**, a hidden `formableFlow` value the shell mints on first
+  render and posts back on every step. It keeps two tabs open on the same
+  multi-page form from interleaving their answers into one session slot.
+
+If the page holding the form is cached - Craft's `{% cache %}` tag,
 [Blitz](https://putyourlightson.com/plugins/blitz), a reverse proxy or a CDN -
-the one token baked into the cached HTML is served to every visitor. Craft
-validates the token against the visitor's own session, so everyone except
-whoever triggered the cache write gets a CSRF failure and a 400 on submit.
-This applies to single-page forms exactly as it does to multi-page ones, and
-it's the more severe problem: a multi-page form degrades under caching, a
-form with a stale CSRF token stops accepting submissions outright.
+every visitor is served the values from whoever triggered the cache write.
 
-Multi-page forms have a second, independent issue. They keep the submitter's
-place with a per-render **flow id** - a hidden `formableFlow` value the shell
-mints on first render and posts back on every step. It is what stops two tabs
-open on the same form from interleaving their answers into one session slot.
-That id is baked into cached markup the same way the CSRF token is. Progress
-stays isolated _between_ visitors (the session slots behind the id are
-per-visitor), but a single visitor who opens the form in two tabs is served
-the same baked id in both, so the per-tab isolation degrades to the
-interleaving it exists to prevent.
+**Formable refreshes all three after the page loads.** Cache the page as you
+like: when the bundle enhances a form it makes one small request to
+`formable/submissions/tokens`, which returns a fresh CSRF token, time token and
+flow id, and writes them into the form. This works in both editions, for
+single-page and multi-page forms, with no template changes.
 
-**Recommendation:** don't cache the markup of a form, or the page region that
-holds it. When you cache a template that renders one, keep the form outside
-the cached block:
+The request is anonymous, is served with `Cache-Control: no-store` so a CDN
+won't cache it, and goes through Craft's action trigger, so a custom `actionTrigger` or a site in a subfolder is
+honoured. Forms on the same page share one request. If it fails, the form is
+left exactly as rendered.
+
+### What still needs care
+
+- **A visitor with JavaScript off still gets a 400** on a cached page. Nothing
+  on the server can refresh a token the browser never asks for. A form that has
+  to work without JavaScript needs its page kept out of the cache.
+- **The minimum submit time needs JavaScript on a cached page.** A visitor
+  without JavaScript submits the time token the cache baked in. Once that token
+  is more than 24 hours old Formable treats it as missing, and a form with a
+  minimum submit time rejects the submission as too fast. Within the first day
+  the token reads as a slow, human-looking visitor and passes.
+- **A form that is already carrying progress is left alone.** A form
+  re-rendered after a validation error, or opened from a resume link, keeps the
+  flow id it was given, because that id owns stored answers. Those pages aren't
+  the ones a cache serves anyway.
+- **The refresh starts the visitor's session.** On a cached page that request is
+  what creates it, so a CDN rule that varies on cookies will see traffic it
+  didn't before.
+
+### Cookbook
+
+**Blitz.** Cache the page as normal. You don't need `craft.blitz.csrfInput()`
+or an exclusion for the form's URL. If you already use
+`craft.blitz.csrfInput()`, keep it: it is harmless alongside Formable's refresh.
+
+**A reverse proxy or CDN.** Cache the page. Make sure
+`/actions/formable/submissions/tokens` (or wherever your `actionTrigger`
+points) is never cached: Formable sends `no-store` on it, but a rule that
+overrides origin headers can defeat that. Don't strip cookies from the
+response of that path, since it is what sets the visitor's session.
+
+**Craft's `{% cache %}` tag.** A form inside a cached block now works. Leaving
+it outside, as earlier versions recommended, is still fine but no longer
+required:
 
 ```twig
 {% cache %}
-    {# expensive page chrome #}
+    {# expensive page chrome, and the form too #}
+    {{ craft.formable.renderForm('signup') }}
 {% endcache %}
-
-{{ craft.formable.renderForm('signup') }}
 ```
 
-Full-page caching (Blitz, a CDN) of a URL that carries a form has the same
-effect - add the URL to the cache's exclusion list, or use one of the two
-options below to keep the CSRF token itself cache-safe:
+**`asyncCsrfInputs`.** Craft's own setting swaps the CSRF input for a
+placeholder that Craft's JavaScript fills in. It remains a fine choice and
+complements Formable's refresh rather than being replaced by it: Formable
+replaces the placeholder with the fetched token if Craft's script hasn't yet.
+Neither helps a visitor without JavaScript.
 
-- **Craft's `asyncCsrfInputs` general config setting.** With it on, `csrfInput()`
-  emits a placeholder instead of a baked-in token, and Craft's own front-end
-  JavaScript fetches a fresh one after the page loads. This makes the page
-  itself cacheable, but it still doesn't solve the multi-page flow-id problem
-  above, so a multi-page form still needs to sit outside the cached region or
-  have its URL excluded.
-- **Blitz's own CSRF injection**, `craft.blitz.csrfInput()`, used in place of
-  Craft's `csrfInput()`. Blitz fetches and injects a fresh token via a small
-  AJAX request when the page is served from cache. This only helps for pages
-  Blitz itself is caching - it isn't a substitute for `asyncCsrfInputs` under
-  a reverse proxy or CDN that Blitz doesn't control.
+### Turning it off
 
-Formable doesn't call either of these on your behalf, because doing so is a
-site-wide caching decision, not a per-form one. If you override
-`_shellOpen.twig` to swap in one of them, remember it still needs to run for
-every form the override renders, not just the happy path.
+Set **Refresh Tokens on Cached Pages** off under Formable's settings (or
+`refreshCachedTokens => false` in `config/formable.php`) if your forms are never
+cached, or you refresh the CSRF token another way. The attribute that triggers
+the request then isn't rendered, so nothing else changes.
+
+### For template overrides
+
+The refresh is driven by three attributes, rendered by the shipped templates:
+
+- `data-formable-tokens` on the `<form>`, holding the endpoint URL. Absent when
+  the setting is off, which is how the front end knows not to run.
+- `data-formable-flow` on the `formableFlow` input, present only when the
+  flow id was minted for this render and is safe to replace.
+- `data-formable-time-token` on the time field's input.
+
+If you override `_shellOpen.twig` or `_spam.twig`, keep them. The CSRF input
+needs no attribute: it is found by the name in the endpoint's response.
 
 ## Content Security Policy
 

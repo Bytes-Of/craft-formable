@@ -23,9 +23,20 @@ const emit = defineEmits<{ 'update:modelValue': [value: unknown] }>();
 
 const store = useBuilderStore();
 const inputId = computed(() => `fb-setting-${props.setting.name}`);
-const describedBy = computed(() =>
-  props.setting.instructions ? `${inputId.value}-instructions` : undefined,
-);
+
+/**
+ * The warning and errors join the instructions so a screen reader on the
+ * input hears why it's marked invalid, not just that it is.
+ */
+const describedBy = computed(() => {
+  const ids = [
+    props.setting.instructions ? `${inputId.value}-instructions` : null,
+    props.warning ? `${inputId.value}-warning` : null,
+    props.errors?.length ? `${inputId.value}-errors` : null,
+  ].filter((id) => id !== null);
+
+  return ids.length ? ids.join(' ') : undefined;
+});
 
 function update(value: unknown): void {
   emit('update:modelValue', value);
@@ -327,9 +338,15 @@ function onNumberInput(event: Event): void {
       {{ t('No editor for setting type “{type}”.', { type: setting.type }) }}
     </p>
 
-    <p v-if="warning" class="fb-setting__warning">{{ warning }}</p>
+    <p v-if="warning" :id="`${inputId}-warning`" class="fb-setting__warning">
+      {{ warning }}
+    </p>
 
-    <ul v-if="errors?.length" class="fb-setting__errors">
+    <ul
+      v-if="errors?.length"
+      :id="`${inputId}-errors`"
+      class="fb-setting__errors"
+    >
       <li v-for="error in errors" :key="error">{{ error }}</li>
     </ul>
   </div>

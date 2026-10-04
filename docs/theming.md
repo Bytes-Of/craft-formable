@@ -333,6 +333,7 @@ caption). Everything else below takes effect only at level `default`.
 | `--formable-color-accent-500`  | `#3b82f6` |
 | `--formable-color-accent-600`  | `#2563eb` |
 | `--formable-color-danger-50`   | `#fef2f2` |
+| `--formable-color-danger-400`  | `#f87171` |
 | `--formable-color-danger-500`  | `#ef4444` |
 | `--formable-color-danger-600`  | `#dc2626` |
 | `--formable-color-danger-700`  | `#b91c1c` |
@@ -345,8 +346,9 @@ caption). Everything else below takes effect only at level `default`.
 
 The neutral ramp is achromatic (equal red/green/blue at every rung) and
 monotonic - every rung is lighter than the one below it, all the way from
-`-50` to `-950`. `-700`, `-800` and `-950`, and the danger/success `-500` and
-`-950` rungs, exist for dark mode - a light rebrand never needs to touch them.
+`-50` to `-950`. `-700`, `-800` and `-950`, the danger `-400` and success
+`-500` rungs, and both `-950` rungs exist for dark mode - a light rebrand never
+needs to touch them.
 
 The accent ramp is deliberately small: the button, the checkbox/radio tick
 and the secondary/ghost button text all paint from the neutral ramp, so accent

@@ -15,7 +15,6 @@ use bytesof\formable\fields\FileUpload;
 use bytesof\formable\jobs\PurgeSubmissions;
 use bytesof\formable\models\FormSettings;
 use bytesof\formable\models\SpamContext;
-use bytesof\formable\models\SpamResult;
 use bytesof\formable\Plugin;
 use bytesof\formable\records\SubmissionHistoryRecord;
 use bytesof\formable\records\SubmissionNoteRecord;
@@ -396,11 +395,22 @@ final class Submissions extends Component
 
         // Spam is weighed only once the payload is otherwise valid - no point
         // scoring a request that would have been rejected anyway - and before
-        // it is stored or allowed to notify anyone.
-        $spamResult = $this->getSpam()->evaluate($form, $submission, $spam ?? SpamContext::empty());
+        // it is stored or allowed to notify anyone. A `beforeSubmit` handler
+        // backed by an external spam service may already have marked it, and
+        // that verdict has to stop notifications and integrations just as
+        // ours does - so it skips the built-in checks rather than being
+        // second-guessed by them.
+        if (!$submission->isSpam) {
+            $spamResult = $this->getSpam()->evaluate($form, $submission, $spam ?? SpamContext::empty());
 
-        if ($spamResult->isSpam) {
-            return $this->handleSpam($form, $submission, $spamResult);
+            if ($spamResult->isSpam) {
+                $submission->isSpam = true;
+                $submission->spamReason = $spamResult->reason?->value;
+            }
+        }
+
+        if ($submission->isSpam) {
+            return $this->handleSpam($form, $submission);
         }
 
         // A form can be configured to notify without keeping a copy. The
@@ -418,7 +428,8 @@ final class Submissions extends Component
     }
 
     /**
-     * Disposes of a submission a spam check caught.
+     * Disposes of a submission marked as spam, by a built-in check or by a
+     * `beforeSubmit` handler.
      *
      * Flagged spam is kept - stored with its reason so a human can find it in
      * the CP spam queue and rescue a false positive; rejected spam is dropped.
@@ -429,11 +440,8 @@ final class Submissions extends Component
      * response, because telling a bot which check caught it only teaches it how
      * to slip past next time.
      */
-    private function handleSpam(Form $form, Submission $submission, SpamResult $result): bool
+    private function handleSpam(Form $form, Submission $submission): bool
     {
-        $submission->isSpam = true;
-        $submission->spamReason = $result->reason?->value;
-
         // A single hook fires for either disposition, so logging or alerting on
         // spam doesn't have to infer it from the success path.
         $this->fireError($submission, SubmissionErrorEvent::REASON_SPAM);

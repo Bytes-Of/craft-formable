@@ -26,15 +26,20 @@ enum SpamReason: string
     case Captcha = 'captcha';
 
     /**
-     * A human-readable label for a stored reason code, falling back to a generic
-     * "Spam" for a null code or one this version no longer recognises (an older
-     * code, or a check that has since been removed).
+     * A human-readable label for a stored reason code.
+     *
+     * A code that isn't one of ours is shown as written: it is the reason a
+     * `beforeSubmit` handler gave - "Blocked by OOPSpam" - and replacing it
+     * with a generic label would hide which service caught the submission.
+     * Only a missing reason falls back to "Spam".
      */
     public static function labelFor(?string $code): string
     {
-        $reason = $code !== null ? self::tryFrom($code) : null;
+        if ($code === null || $code === '') {
+            return Craft::t('formable', 'Spam');
+        }
 
-        return $reason?->label() ?? Craft::t('formable', 'Spam');
+        return self::tryFrom($code)?->label() ?? $code;
     }
 
     public function label(): string

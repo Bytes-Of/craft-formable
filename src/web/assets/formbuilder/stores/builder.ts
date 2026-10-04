@@ -47,6 +47,27 @@ interface Draft {
   form: FormState;
 }
 
+/**
+ * Plain data all the way down, ready for `structuredClone()`. Form state is
+ * JSON-shaped (it round-trips through the save endpoint), so arrays and plain
+ * objects are the only containers to walk.
+ */
+function deepToRaw<T>(value: T): T {
+  const raw = toRaw(value);
+
+  if (Array.isArray(raw)) {
+    return raw.map((item: unknown) => deepToRaw(item)) as T;
+  }
+
+  if (raw !== null && typeof raw === 'object') {
+    return Object.fromEntries(
+      Object.entries(raw).map(([key, item]) => [key, deepToRaw(item)]),
+    ) as T;
+  }
+
+  return raw;
+}
+
 export const useBuilderStore = defineStore('builder', () => {
   const config = ref<BuilderConfig | null>(null);
   const form = ref<FormState>({
@@ -88,11 +109,12 @@ export const useBuilderStore = defineStore('builder', () => {
 
   /**
    * A deep, non-reactive snapshot of the form as it stands. `form.value` is a
-   * reactive Proxy, and `structuredClone()` rejects a Proxy outright -
-   * `toRaw()` unwraps it back to plain data first.
+   * reactive Proxy, and `structuredClone()` rejects a Proxy anywhere in the
+   * tree - including the ones a panel embeds when it writes back a spread of
+   * reactive state, which a top-level `toRaw()` never reaches.
    */
   function cloneFormState(): FormState {
-    return structuredClone(toRaw(form.value));
+    return structuredClone(deepToRaw(form.value));
   }
 
   // The state a burst of edits diverged from, so the debounced commit below
@@ -699,15 +721,16 @@ export const useBuilderStore = defineStore('builder', () => {
   }
 
   /**
-   * The status-bar text after a successful save. A rename that left a
-   * notification's `{token}` pointing at the old handle is the one thing the
+   * What the status bar says after a successful save in place of a bare
+   * "Saved", or nothing when that is all there is to say. A rename that left
+   * a notification's `{token}` pointing at the old handle is the one thing the
    * server can't fix for the author, so it's named here rather than buried.
    */
   function saveMessageFor(response: SaveResponse): string {
     const stale = response.staleTokenNotifications ?? [];
 
     if (stale.length === 0) {
-      return response.message ?? '';
+      return '';
     }
 
     return t(
@@ -1181,7 +1204,7 @@ export const useBuilderStore = defineStore('builder', () => {
     form.value = state;
     applyingHistory = false;
 
-    historyBase = structuredClone(state);
+    historyBase = structuredClone(deepToRaw(state));
     activePageIndex.value = Math.min(
       activePageIndex.value,
       Math.max(0, form.value.pages.length - 1),

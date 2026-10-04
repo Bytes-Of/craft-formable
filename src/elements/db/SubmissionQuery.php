@@ -18,6 +18,11 @@ use craft\helpers\Db;
 use craft\models\Site;
 
 /**
+ * An unqualified query answers with the submissions a listing wants - completed,
+ * and not flagged as spam. A query that names its submissions by id or uid gets
+ * them whatever state they are in, unless it narrowed by spam or progress
+ * itself; see {@see pinnedToIds()}.
+ *
  * @template TKey of array-key
  * @template TElement of Submission
  * @extends ElementQuery<TKey, TElement>
@@ -32,6 +37,12 @@ final class SubmissionQuery extends ElementQuery
     public mixed $submittedSiteId = null;
     public ?bool $isIncomplete = false;
     public ?bool $isSpam = false;
+    /**
+     * Whether the caller narrowed by progress or spam itself, rather than
+     * inheriting the default - see {@see pinnedToIds()}.
+     */
+    private bool $askedAboutProgress = false;
+    private bool $askedAboutSpam = false;
     /** @internal */
     public ?string $resumeToken = null;
     public mixed $relatedToElementId = null;
@@ -149,6 +160,7 @@ final class SubmissionQuery extends ElementQuery
     public function isIncomplete(?bool $value): static
     {
         $this->isIncomplete = $value;
+        $this->askedAboutProgress = true;
 
         return $this;
     }
@@ -159,6 +171,7 @@ final class SubmissionQuery extends ElementQuery
     public function isSpam(?bool $value): static
     {
         $this->isSpam = $value;
+        $this->askedAboutSpam = true;
 
         return $this;
     }
@@ -258,11 +271,13 @@ final class SubmissionQuery extends ElementQuery
             $this->subQuery?->andWhere(Db::parseNumericParam('formable_submissions.submittedSiteId', $this->submittedSiteId));
         }
 
-        if ($this->isIncomplete !== null) {
+        $pinnedToIds = $this->pinnedToIds();
+
+        if ($this->isIncomplete !== null && ($this->askedAboutProgress || !$pinnedToIds)) {
             $this->subQuery?->andWhere(['formable_submissions.isIncomplete' => $this->isIncomplete]);
         }
 
-        if ($this->isSpam !== null) {
+        if ($this->isSpam !== null && ($this->askedAboutSpam || !$pinnedToIds)) {
             $this->subQuery?->andWhere(['formable_submissions.isSpam' => $this->isSpam]);
         }
 
@@ -290,6 +305,68 @@ final class SubmissionQuery extends ElementQuery
         }
 
         return parent::beforePrepare();
+    }
+
+    /**
+     * Whether the query names the submissions it wants, by id or uid.
+     *
+     * The spam and progress defaults are there to keep listings honest - a Twig
+     * loop, a GraphQL query, the CP index - and a listing is never "these exact
+     * ones". Craft's own lookups are: the bulk delete, `elements/delete` behind
+     * a card's action menu, the slideout editor and the restore action all load
+     * elements back with `find()->id($ids)` and reset only the filters Craft
+     * knows about (status, drafts, trashed). A default of ours is invisible to
+     * them, so a spam submission answered "no such element" and the CP either
+     * refused the request or reported a delete it never performed (GitHub issue
+     * #1). Named outright, the defaults stand aside; a caller that narrowed by
+     * spam or progress itself is still obeyed.
+     *
+     * Only plain values count. `id(false)`, `id('not 5')`, `uid(['not', …])` and
+     * the rest exclude rather than name, so they leave the defaults in place.
+     */
+    private function pinnedToIds(): bool
+    {
+        return self::namesAll($this->id, static fn(mixed $value): bool => is_numeric($value))
+            || self::namesAll($this->uid, self::namesUid(...));
+    }
+
+    /**
+     * Whether a query param holds at least one value and every one of them names
+     * an element - so `null`, `false` and `[]`, which name none, don't count.
+     *
+     * @param callable(mixed): bool $names
+     */
+    private static function namesAll(mixed $param, callable $names): bool
+    {
+        if (!is_array($param)) {
+            return $param !== null && !is_bool($param) && $names($param);
+        }
+
+        if ($param === []) {
+            return false;
+        }
+
+        foreach ($param as $value) {
+            if (!$names($value)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * A uid names an element when it is a bare uid, rather than one of Craft's
+     * `not` / `and` / `or` forms. An id needs no such check: none of them is
+     * numeric.
+     */
+    private static function namesUid(mixed $value): bool
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return false;
+        }
+
+        return !in_array(strtolower((string)strtok(trim($value), ' ')), ['and', 'or', 'not'], true);
     }
 
     /**

@@ -147,6 +147,15 @@ final class PreviewController extends Controller
         $options = $scenarioOptions;
         $options['theme'] = $theme;
 
+        // A form renders pinned light by default (0071) and a pinned form
+        // ignores its ancestor's scheme, so the `<html>` attribute alone would
+        // show a light form on a dark page. The form gets the scheme as its
+        // own setting, the way a site renders it; the attribute stays for the
+        // frame's chrome.
+        if ($scheme !== 'system' && !PreviewScenarios::pinsScheme($scenario)) {
+            $options['colorScheme'] = $scheme;
+        }
+
         if ($scenario['flashSuccess'] ?? false) {
             $this->flashSuccess($form);
         }
@@ -292,8 +301,15 @@ final class PreviewController extends Controller
             return $this->queryValue($name, $allowed, $default);
         };
 
+        // A pinned form paints no background of its own (0071): it trusts the
+        // page around it to be in its scheme. So the frame starts in the
+        // scheme the form is pinned to, the way a site built for it would,
+        // or a pinned-dark form shows light text on a light page.
+        $pinned = $scenario['options']['colorScheme'] ?? null;
+        $schemeDefault = in_array($pinned, ['light', 'dark'], true) ? $pinned : 'system';
+
         return [
-            'scheme' => $resolve('scheme', self::SCHEMES, 'system'),
+            'scheme' => $resolve('scheme', self::SCHEMES, $schemeDefault),
             'width' => $resolve('width', self::WIDTHS, 'full'),
             'host' => $resolve('host', self::HOSTS, 'none'),
             'dir' => $resolve('dir', self::DIRS, 'ltr'),

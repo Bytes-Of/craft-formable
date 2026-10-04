@@ -526,9 +526,12 @@ final class Notifications extends Component
      */
     public function sendResumeLink(Form $form, string $email, string $token): bool
     {
+        // Not `token`: that is Craft's own `tokenParam`, which it looks up
+        // among its preview tokens while booting and answers 400 before any
+        // plugin runs.
         $url = UrlHelper::siteUrl('formable/resume', [
             'form' => $form->handle,
-            'token' => $token,
+            'resumeToken' => $token,
         ]);
 
         try {

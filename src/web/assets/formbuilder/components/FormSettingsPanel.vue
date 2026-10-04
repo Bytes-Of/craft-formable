@@ -143,7 +143,7 @@ const statusOptions = computed(() => store.config?.statuses ?? []);
       <h2 class="fb-settings__heading">{{ group.label }}</h2>
 
       <template v-for="setting in group.settings" :key="setting.name">
-        <div v-if="isLocked(setting)" class="fb-setting fb-setting--locked">
+        <div v-if="isLocked(setting)" class="fb-setting">
           <span class="fb-setting__label">{{ setting.label }}</span>
           <p v-if="setting.instructions" class="fb-setting__instructions">
             {{ setting.instructions }}

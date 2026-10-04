@@ -271,6 +271,10 @@
     --formable-color-accent-600: #2563eb;
 
     --formable-color-danger-50: #fef2f2;
+
+    /* Dark mode's error text. `-500` measured 4.37:1 on the dark error
+       surface, short of AA; this is 5.94:1 there. */
+    --formable-color-danger-400: #f87171;
     --formable-color-danger-500: #ef4444;
     --formable-color-danger-600: #dc2626;
     --formable-color-danger-700: #b91c1c;
@@ -678,7 +682,7 @@
       --formable-button-secondary-bg-hover: var(--formable-color-neutral-800);
       --formable-button-ghost-bg-hover: var(--formable-color-neutral-800);
 
-      --formable-error: var(--formable-color-danger-500);
+      --formable-error: var(--formable-color-danger-400);
       --formable-error-surface: var(--formable-color-danger-950);
       --formable-success: var(--formable-color-success-500);
       --formable-success-surface: var(--formable-color-success-950);
@@ -714,7 +718,7 @@
     --formable-button-secondary-bg-hover: var(--formable-color-neutral-800);
     --formable-button-ghost-bg-hover: var(--formable-color-neutral-800);
 
-    --formable-error: var(--formable-color-danger-500);
+    --formable-error: var(--formable-color-danger-400);
     --formable-error-surface: var(--formable-color-danger-950);
     --formable-success: var(--formable-color-success-500);
     --formable-success-surface: var(--formable-color-success-950);

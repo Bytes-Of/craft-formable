@@ -9,7 +9,9 @@
  #
  # Variables:
  #   form        Form element
- #   submission  the resumed (incomplete) submission
+ #   submission  the resumed (incomplete) submission, or null once it is
+ #               finished: a submit without JavaScript comes back here, and
+ #               the form then shows its success message
  #   page        the page the submitter left off on
  #   flowId      the flow id already attached to this session for the submission
  #}
@@ -28,9 +30,11 @@
     {{ beginBody() }}
     <main class="formable-resume-page">
         <h1>{{ form.title ?? form.handle }}</h1>
-        <p class="formable-resume-page__intro">
-            {{ 'Welcome back - pick up where you left off.'|t('formable') }}
-        </p>
+        {% if submission %}
+            <p class="formable-resume-page__intro">
+                {{ 'Welcome back - pick up where you left off.'|t('formable') }}
+            </p>
+        {% endif %}
 
         {# Forces the `default` theme level for this render regardless of the
            site's own `Settings::$themeLevel` - unlike an embedded form, this
@@ -40,11 +44,21 @@
            here with nothing to fall back on. A site that wants this page
            unstyled, or styled its own way, already has the override path the
            doc comment above describes. #}
-        {{ craft.formable.renderForm(form, {
+        {# `restartUrl: false` drops the success state's "Submit another
+           response" link. Its default is the URL the form was rendered on,
+           which here is this single-use resume link - spent by the time the
+           success state shows, so following it would 404. The blank form
+           below the message is this page's way to another response; it posts
+           to the submit action like any other embed. #}
+        {{ craft.formable.renderForm(form, submission ? {
             submission: submission,
             page: page,
             flowId: flowId,
             theme: 'default',
+            restartUrl: false,
+        } : {
+            theme: 'default',
+            restartUrl: false,
         }) }}
     </main>
     {{ endBody() }}

@@ -535,15 +535,15 @@ function onSettingChange(name: string, value: string): void {
 
 <style scoped>
 .fb-translations__field {
-  border-top: 1px solid #eef0f2;
-  padding-top: 12px;
-  margin-top: 12px;
+  border-block-start: 1px solid #eef0f2;
+  padding-block-start: 12px;
+  margin-block-start: 12px;
 }
 
 .fb-translations__field:first-child {
-  border-top: none;
-  padding-top: 0;
-  margin-top: 0;
+  border-block-start: none;
+  padding-block-start: 0;
+  margin-block-start: 0;
 }
 
 .fb-translations__field-name {
@@ -553,8 +553,8 @@ function onSettingChange(name: string, value: string): void {
 }
 
 .fb-translations__nested {
-  margin-left: 16px;
-  padding-left: 12px;
-  border-left: 2px solid #eef0f2;
+  margin-inline-start: 16px;
+  padding-inline-start: 12px;
+  border-inline-start: 2px solid #eef0f2;
 }
 </style>

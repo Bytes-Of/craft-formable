@@ -26,10 +26,14 @@
  #   errors          field errors keyed by handle
  #   values          field values keyed by handle
  #   successMessage  flashed message from a completed non-JS submit, or null
+ #   savedMessage    flashed confirmation from a non-JS save for later, or null
  #   hasFileUploads  whether any field uploads files (drives the enctype)
  #   currentPage     index of the page this render opens on
  #   isReview        whether this render is the review step
  #   flowId          identifies this pass through the form (per-tab progress slot)
+ #   flowIsFresh     whether flowId was minted for this render, and so is safe for a
+ #                   cached page to replace
+ #   tokensUrl       endpoint that mints fresh tokens for a cached page, or null when off
  #   sequence        indexes of the pages the submitter will actually see
  #   progress        { step, total } over the visible pages
  #   isLastPage      whether currentPage is the last in the sequence
@@ -39,6 +43,8 @@
  #   paletteHash     key for the registered palette CSS block, or null when nothing is set
  #   paletteVarsJson the palette's CSS declarations as JSON, or null - read by style-vars.ts's CSP repair pass
  #   headingLevel    heading level the page/review/success headings start from (default 2)
+ #   restartUrl      where the success state's "Submit another response" link
+ #                   goes, or null for no link
  #}
 {% set hasErrors = errors|length > 0 or submission.hasErrors() %}
 {# `flowId` is unique to this pass through the form even when `options.id` isn't
@@ -73,8 +79,11 @@
     form: form,
     options: options,
     flowId: flowId,
+    flowIsFresh: flowIsFresh,
+    tokensUrl: tokensUrl,
     formId: formId,
     headingLevel: headingLevel,
+    restartUrl: restartUrl ?? null,
     settings: settings,
     errorMessage: errorMessage,
     errors: errors,
@@ -83,6 +92,7 @@
     fieldIdPrefix: "#{formId}-field-",
     successMessage: successMessage,
     successDetails: successDetails,
+    savedMessage: savedMessage,
     colorScheme: colorScheme,
     palette: palette,
     paletteHash: paletteHash,

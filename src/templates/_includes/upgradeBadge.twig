@@ -7,6 +7,8 @@
  #                     shown in every edition.
  #   prompt(feature) - a Lite upgrade call-to-action: the pill, a short line of
  #                     copy, and an "Upgrade" link to the plugin's edition page.
+ #                     Craft keeps that page admin-only, so anyone else is asked
+ #                     to find an administrator rather than handed a 403.
  #                     Callers should only render this when the edition is Lite.
  #}
 
@@ -21,9 +23,14 @@
         <span class="formable-upgrade__text">
             {{ '{feature} is a Formable Pro feature.'|t('formable', { feature: feature }) }}
         </span>
-        <a class="formable-upgrade__link" href="{{ url('settings/plugins/formable') }}#formable-editions">
-            {{ 'Upgrade to Pro'|t('formable') }}
-        </a>
+        {% set upgradeUrl = craft.app.plugins.getPlugin('formable').getUpgradeUrl() %}
+        {% if upgradeUrl %}
+            <a class="formable-upgrade__link" href="{{ upgradeUrl }}">
+                {{ 'Upgrade to Pro'|t('formable') }}
+            </a>
+        {% else %}
+            <span class="formable-upgrade__link">{{ 'Ask an administrator to upgrade.'|t('formable') }}</span>
+        {% endif %}
     </div>
 {% endmacro %}
 
@@ -60,7 +67,7 @@
         }
 
         .formable-upgrade__link {
-            margin-left: auto;
+            margin-inline-start: auto;
             font-weight: 600;
         }
     {% endcss %}

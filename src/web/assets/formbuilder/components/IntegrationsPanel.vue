@@ -169,16 +169,13 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
 
     <div v-if="!integrations.length" class="fb-integrations__empty">
       <p>{{ t('No integrations are set up yet.') }}</p>
-      <p>
-        <a
-          v-if="integrationsUrl"
-          class="go"
-          :href="integrationsUrl"
-          target="_blank"
-          rel="noopener"
-        >
+      <p v-if="integrationsUrl">
+        <a class="go" :href="integrationsUrl" target="_blank" rel="noopener">
           {{ t('Add one in Formable’s integration settings') }}
         </a>
+      </p>
+      <p v-else>
+        {{ t('Ask someone who manages Formable’s integrations to add one.') }}
       </p>
     </div>
 
@@ -405,7 +402,7 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  margin-bottom: 16px;
+  margin-block-end: 16px;
   padding: 10px 12px;
   border: 1px solid var(--warning-color, #d4762a);
   border-radius: 5px;
@@ -466,7 +463,7 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
   background: none;
   border: none;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   font: inherit;
 }
 
@@ -479,11 +476,11 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-integrations__item-state--off {
-  color: #9aa5b1;
+  color: #606d7b;
 }
 
 .fb-integrations__req {
@@ -491,9 +488,9 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
 }
 
 .fb-integrations__log {
-  margin-top: 28px;
-  border-top: 1px solid #e3e5e8;
-  padding-top: 16px;
+  margin-block-start: 28px;
+  border-block-start: 1px solid #e3e5e8;
+  padding-block-start: 16px;
 }
 
 .fb-integrations__log-title {
@@ -510,9 +507,10 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
 
 .fb-integrations__log-table th,
 .fb-integrations__log-table td {
-  text-align: left;
-  padding: 6px 12px 6px 0;
-  border-bottom: 1px solid #eef0f2;
+  text-align: start;
+  padding-block: 6px;
+  padding-inline: 0 12px;
+  border-block-end: 1px solid #eef0f2;
   vertical-align: top;
 }
 
@@ -522,7 +520,7 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
 }
 
 .fb-integrations__log-status--ok {
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-integrations__log-status--fail {
@@ -530,15 +528,15 @@ if (selectedHandle.value === null && integrations.value.length > 0) {
 }
 
 .fb-integrations__log-table .fb-integrations__log-action {
-  padding-right: 0;
-  text-align: right;
+  padding-inline-end: 0;
+  text-align: end;
   white-space: nowrap;
 }
 
 .fb-integrations__resend-result {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-integrations__resend-result--error {

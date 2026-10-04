@@ -1,5 +1,65 @@
 # Release Notes for Formable
 
+## 1.1.0 - 2026-10-04
+
+### Added
+
+- **Forms keep working on cached pages.** If the page holding a form is served from Blitz, a CDN, a reverse proxy or Craft’s `{% cache %}` tag, the form now fetches a fresh security token, timing token and per-tab id as soon as it loads, so a cached page no longer rejects every visitor but the first with a 400. It costs one small request per page view and works in both editions. Visitors with JavaScript turned off still submit the token the page was cached with, so a form that must work without JavaScript should stay out of the cache. The **Refresh Tokens on Cached Pages** setting turns it off. See [Caching forms](docs/templating.md#caching-forms).
+
+### Changed
+
+- **The minimum submit time ignores stale timing tokens.** A timing token older than 24 hours is now treated as missing, so on a form with a minimum submit time a submission carrying one is rejected as too fast. Before, an old token only ever looked like a slow visitor and always passed. This affects visitors without JavaScript who are served a page cached for more than a day; see [Caching forms](docs/templating.md#caching-forms).
+
+- **A new form’s handle writes itself from the title.** Typing a title now fills the handle beside it - “Contact us” gives `contactUs` - so there’s nothing to work out before saving. The handle is still yours to change: edit it and it stops following the title. Renaming a form you’ve already saved never moves its handle, since that’s what your templates pass to `craft.formable.form()`.
+
+### Fixed
+
+- **Save-and-resume links open the saved form.** The emailed link carried its code in a `token` parameter, which is the name Craft reserves for its own preview links. On any site that hadn’t renamed Craft’s `tokenParam` setting, opening the link showed a “400 Invalid token” error instead of the form. Links now use `resumeToken`. Links sent by 1.0.0 still open on sites where they already worked.
+
+- **Forms submitted without JavaScript come back to the page they were on.** When a visitor without JavaScript submitted a form that doesn’t set its own `redirect`, Craft sent them back to the page’s path without its query string, so `/apply?form=contact` came back as `/apply`. A page that chooses its form, or anything else, from the query string lost it, and the success message never appeared. The visitor now returns to the exact address they submitted from. The same goes for editing or deleting a submission from a member’s account page. A `redirect` your template posts still takes priority.
+
+- **“Submit another response” no longer leads to an expired-link page.** On the page a save-and-resume link opens, the link under the success message pointed back at that same address, whose code had just been used up by the submission, so a visitor who clicked it was told the link had expired. It is no longer offered there; the blank form below the message is the way to send another response. On every other page the link is unchanged, and a template can now set it with the new `restartUrl` option, or switch it off with `restartUrl: false`, on any page whose own address won’t serve the form a second time. See [Templating](docs/templating.md).
+
+- **Finishing a resumed form without JavaScript shows the success message.** A visitor who opened a save-and-resume link with JavaScript turned off could fill in the rest of the form, but submitting it ended on a “400 Bad Request” page, although the submission was saved. They now see the form’s success message on the same page.
+
+- **Saving a form for later without JavaScript confirms it.** When a visitor with JavaScript turned off saved a form to finish later, the resume link was emailed, but the page reloaded on the same step with no sign that it had been. The message went into Craft’s general notice, which most templates don’t print. The confirmation now appears above the form, which stays open on the step that was saved, so the visitor can also carry on in the same tab. A template that prints Craft’s notices no longer receives this one, so the message isn’t shown twice.
+
+- **Screen readers announce required choice groups.** A required field made of several controls - radio buttons, checkboxes, a rating, a name, an address or a table - showed its asterisk, but the asterisk is hidden from screen readers, and the “required” the group carried is one that ARIA doesn’t allow on a group, so screen readers could ignore it. The group’s label now says “required” to screen readers, in words. Sites that translate Formable can translate it with the new `required` key.
+
+- **A field’s error message updates when the mistake changes.** If a visitor left a required email field blank and then typed something that isn’t an email address, the field kept showing “is required” next to the new message, and screen readers only read the old one. Each field now shows only its current error.
+
+- **`{{ submission.id }}` works in the success message and the redirect URL.** Both settings suggest it as their Twig example, but `submission` was never defined there, so a reference number came out as “#” and a redirect to `/thanks?id={{ submission.id }}` lost its id. Both now render, and a message can also use `{{ form }}`. The shorter `{id}` form was never affected.
+
+- **Deleting a form deletes its spam and unfinished submissions too.** Moving a form to the trash took its ordinary submissions with it but left submissions flagged as spam, and save-and-resume progress that was never finished, behind as live entries. Emptying the trash then left their answers in the database until Craft's next garbage collection. All of a form's submissions now go to the trash with it, come back if it’s restored, and are removed when it’s deleted for good.
+
+- **Deleting submissions from the Spam queue deletes them.** Selecting submissions in the Spam queue and choosing **Delete** said “Submissions deleted.” and left every one of them where it was. Craft looks the selected submissions up by ID before deleting them, and Formable’s own list of submissions leaves out the ones flagged as spam, so Craft found nothing to delete and reported success anyway. Spam submissions now delete, restore from the trash and delete permanently like any other submission.
+
+- **Submissions that another plugin marks as spam no longer send notifications.** A spam-checking plugin or module can mark a submission as spam from the `beforeSubmit` event. Formable stored those submissions as spam, then sent their notification emails and passed them on to integrations anyway. They are now treated exactly like spam caught by Formable’s own checks: the form’s spam setting decides whether they go to the Spam queue or are discarded, and nothing is sent or forwarded. The reason the plugin gives, such as “Blocked by OOPSpam”, now shows in the Spam queue, where it previously showed only as “Spam”. See [Marking a submission as spam](docs/extending.md#example---mark-a-submission-as-spam).
+
+- **GraphQL no longer hands back spam or part-filled submissions when a query names the ones it wants.** `formableSubmissions`, `formableSubmission` and `formableSubmissionCount` describe their `isSpam` and `isIncomplete` arguments as defaulting to false, and they did - except on a query that named its submissions by `id` or `uid`, where both defaults dropped out. A schema with read access to a form’s submissions could then be handed submissions flagged as spam, and forms saved to be finished later, with their answers and the submitter’s IP address. The defaults now hold however a query is written; ask for either on purpose with `isSpam: true` or `isIncomplete: true`. GraphQL is a Pro feature. See [Headless & GraphQL](docs/headless-graphql.md).
+
+- **Upgrade prompts no longer send form authors to an error page.** On Lite, every “Upgrade to Pro” link pointed at the plugin’s settings screen, which Craft only lets administrators open, so anyone else who clicked one got a “403 Forbidden” page. The prompts now show the link only to administrators and ask everyone else to contact one. For administrators, the link now actually jumps to the Edition section.
+
+- **The builder only links to integration settings for people who can open them.** When no integrations are set up, the Integrations tab linked to Formable’s integration settings even for authors without the “Manage integrations” permission, who then got a “403 Forbidden” page. They now see who to ask instead.
+
+- **Screen readers read a builder setting’s error with its input.** When a save was rejected, for example because a field’s handle was a reserved word, the setting’s input was marked invalid but its message wasn’t connected to it, so a screen reader announced only that something was wrong. The message, and any warning, such as a handle another field already uses, is now read out with the input, after its instructions.
+
+- **The form builder lays out correctly in right-to-left languages.** With the control panel in Arabic, Hebrew or another right-to-left language, parts of the builder still followed left-to-right edges: the notification and integration log tables aligned their headings and spacing to the wrong side, the resend button sat at the near edge instead of the far one, nested translation fields were indented from the left, and each field's action buttons sat in the wrong corner of the field. They now follow the reading direction.
+
+- **The buttons that reorder form pages make sense in right-to-left languages.** They were called “Move left” and “Move right”, and their arrows pointed that way, but in a right-to-left control panel the earlier page is on the right, so a screen reader heard “Move left” for a button that moved the page right. They are now called “Move page earlier” and “Move page later”, and their arrows point the way the page moves in either direction. If you translate Formable’s control panel, the two new strings need translating.
+
+- **Undo keeps up with every builder change.** Changing a form setting, or turning on conditional logic for a field or page, caused a script error in the browser about half a second later, and that change could not be undone step by step. Every change now becomes its own undo step.
+
+- **The builder tells you when a renamed field leaves a notification behind.** When you rename a field’s handle, Formable moves stored answers to the new handle, but it leaves the wording of your notifications alone. If a subject or body still uses the old handle in a token such as `{company}`, the builder was meant to name that notification once you saved. It only ever said “Saved”. The status bar beside the Save button now names each notification to update.
+
+- **Screen readers can name every control in the conditions editor.** The dropdowns that build a rule - show or hide, all or any, and each rule’s field, comparison and value - had no labels, so a screen reader announced each one only as a menu. They now say what they set, such as “Rule 2 comparison”.
+
+- **The builder’s small status text is easier to read.** The “Pro” label on upgrade prompts, the On and Off states in the Notifications and Integrations lists, “Sent” in their delivery logs and a test email’s confirmation were all too faint to meet the WCAG AA contrast minimum. So was every Pro-only setting in Lite’s Settings tab, which was shown dimmed. All of them now meet it, and locked settings are no longer dimmed: the upgrade prompt beside them already says they’re locked.
+
+- **Error messages are easier to read on dark forms.** On a form shown in the dark colour scheme, the red text in the error box above the form fell short of the WCAG AA contrast minimum. Error text in the dark scheme is now a lighter red, which meets it both in that box and under each field. The new shade is the `--formable-color-danger-400` token, if your own styles want to use it.
+
+- **Upgrade prompts lay out correctly in right-to-left languages.** The “Upgrade to Pro” link sat right beside the prompt’s text instead of at the far edge, as it does in left-to-right languages.
+
 ## 1.0.0 - 2026-09-28
 
 This is Formable’s first release, for Craft CMS 5.10.7 or later. Pre-release builds were used to develop it, so **Changed** and **Fixed** record where 1.0.0 differs from those, for anyone who installed one. On a fresh install, everything below is simply how Formable behaves.

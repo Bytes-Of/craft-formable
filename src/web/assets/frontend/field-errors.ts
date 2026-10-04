@@ -8,14 +8,21 @@
  */
 
 /**
- * Attaches messages to one field. Same classes, same `aria-describedby`
- * wiring, no `role="alert"` as the server-rendered shape - see
- * `_field.twig:99-110` and 0064 for why there's no alert role here.
+ * Attaches messages to one field, replacing any it already shows. Same
+ * classes, same `aria-describedby` wiring, no `role="alert"` as the
+ * server-rendered shape - see `_field.twig:99-110` and 0064 for why there's no
+ * alert role here.
  */
 export function renderFieldErrors(
   wrapper: HTMLElement,
   messages: string[],
 ): void {
+  // Live validation re-renders a flagged field on every keystroke, and its
+  // error can change kind as it is typed into (blank, then malformed). A
+  // second list would reuse the first one's id, so the control would go on
+  // being described by the stale message.
+  clearFieldErrors(wrapper);
+
   wrapper.classList.add('formable-field--error');
 
   // A fieldset field (radio, checkboxes, table, name, address) describes the

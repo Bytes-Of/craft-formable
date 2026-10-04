@@ -37,9 +37,13 @@ final class CascadeSubmissions extends BaseJob
         $total = count($this->submissionIds);
 
         foreach ($this->submissionIds as $index => $id) {
+            // The ids came from Form::cascadeSubmissionsQuery(), which includes
+            // spam and drafts, so the lookup has to as well.
             $submission = Submission::find()
                 ->id($id)
                 ->status(null)
+                ->isIncomplete(null)
+                ->isSpam(null)
                 ->trashed($this->restore)
                 ->one();
 

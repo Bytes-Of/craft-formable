@@ -52,6 +52,9 @@ final class Spam extends Component
     /**
      * The cache key prefix the rate-limit counters live under.
      */
+    /** Far past any real fill-in session; older than this reads as a stale cached page. */
+    private const TIME_TOKEN_MAX_AGE = 86400;
+
     private const RATE_LIMIT_PREFIX = 'formable.spam.rate-limit';
 
     private ?Settings $_settings = null;
@@ -333,7 +336,12 @@ final class Spam extends Component
 
     /**
      * Seconds since a time token was minted, or null when the token is missing,
-     * malformed, or its signature doesn't check out.
+     * malformed, its signature doesn't check out, or it is older than a day.
+     *
+     * The age cap is what keeps the minimum submit time meaningful behind a
+     * page cache: a visitor without JavaScript submits whatever token the cache
+     * baked in, and without a cap an ever-older token would only ever read as a
+     * slow, human-looking fill-in.
      */
     public function elapsedSeconds(?string $token): ?int
     {
@@ -347,7 +355,9 @@ final class Spam extends Component
             return null;
         }
 
-        return time() - (int)$data;
+        $elapsed = time() - (int)$data;
+
+        return $elapsed > self::TIME_TOKEN_MAX_AGE ? null : $elapsed;
     }
 
     /**

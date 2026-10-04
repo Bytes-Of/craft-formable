@@ -672,11 +672,15 @@ final class Form extends Element
     }
 
     /**
+     * Spam and save-and-resume drafts hold answers too, and the query's
+     * defaults hide both - left out, a trashed form kept them live and a
+     * purged one left their `elements` rows behind.
+     *
      * @return SubmissionQuery<int, Submission>
      */
     private function cascadeSubmissionsQuery(bool $delete): SubmissionQuery
     {
-        $query = Submission::find()->formId($this->id)->status(null);
+        $query = Submission::find()->formId($this->id)->status(null)->isIncomplete(null)->isSpam(null);
 
         return $delete ? $query : $query->trashed()->andWhere(['elements.deletedWithOwner' => true]);
     }

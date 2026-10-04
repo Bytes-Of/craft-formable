@@ -172,6 +172,7 @@ function removeRule(index: number): void {
           <select
             class="fb-conditions__select"
             :value="set.action"
+            :aria-label="t('Action')"
             @change="
               update({ action: ($event.target as HTMLSelectElement).value })
             "
@@ -188,6 +189,7 @@ function removeRule(index: number): void {
           <select
             class="fb-conditions__select"
             :value="set.match"
+            :aria-label="t('Which rules must match')"
             @change="
               update({ match: ($event.target as HTMLSelectElement).value })
             "
@@ -212,6 +214,7 @@ function removeRule(index: number): void {
             <select
               class="fb-conditions__select"
               :value="rule.field"
+              :aria-label="t('Rule {number} field', { number: index + 1 })"
               @change="
                 updateRule(index, {
                   field: ($event.target as HTMLSelectElement).value,
@@ -226,6 +229,7 @@ function removeRule(index: number): void {
             <select
               class="fb-conditions__select"
               :value="rule.operator"
+              :aria-label="t('Rule {number} comparison', { number: index + 1 })"
               @change="
                 updateRule(index, {
                   operator: ($event.target as HTMLSelectElement).value,
@@ -246,6 +250,7 @@ function removeRule(index: number): void {
                 v-if="valueOptions(rule)"
                 class="fb-conditions__select fb-conditions__value"
                 :value="rule.value"
+                :aria-label="t('Rule {number} value', { number: index + 1 })"
                 @change="
                   updateRule(index, {
                     value: ($event.target as HTMLSelectElement).value,
@@ -267,6 +272,7 @@ function removeRule(index: number): void {
                 class="fb-conditions__value"
                 :value="rule.value"
                 :placeholder="t('value')"
+                :aria-label="t('Rule {number} value', { number: index + 1 })"
                 @input="
                   updateRule(index, {
                     value: ($event.target as HTMLInputElement).value,

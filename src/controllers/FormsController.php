@@ -580,7 +580,7 @@ final class FormsController extends Controller
                 ? $plugin->getNotifications()->getRecentLogs($form->id)
                 : [],
             'isPro' => $plugin->isPro(),
-            'upgradeUrl' => UrlHelper::cpUrl('settings/plugins/formable') . '#formable-editions',
+            'upgradeUrl' => $plugin->getUpgradeUrl() ?? '',
             'sites' => array_map(
                 static fn($site): array => [
                     'uid' => $site->uid,
@@ -593,7 +593,7 @@ final class FormsController extends Controller
             'integrationLog' => $form->id !== null
                 ? $plugin->getIntegrations()->getRecentLogsForForm($form->id)
                 : [],
-            'integrationsUrl' => UrlHelper::cpUrl('formable/integrations'),
+            'integrationsUrl' => $plugin->getIntegrationsUrl() ?? '',
             'actions' => [
                 'save' => 'formable/forms/save',
                 'submissionCount' => 'formable/forms/submission-count',

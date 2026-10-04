@@ -41,6 +41,7 @@ use craft\events\RegisterComponentTypesEvent;
 use craft\events\RegisterTemplateRootsEvent;
 use craft\events\RegisterUrlRulesEvent;
 use craft\events\RegisterUserPermissionsEvent;
+use craft\helpers\UrlHelper;
 use craft\services\Dashboard;
 use craft\services\Elements;
 use craft\services\Gc;
@@ -139,6 +140,40 @@ final class Plugin extends BasePlugin
     public function isPro(): bool
     {
         return $this->is(self::EDITION_PRO);
+    }
+
+    /**
+     * Where a Lite upgrade prompt sends the current user, or null when they
+     * could not open it.
+     *
+     * The editions section lives on Craft's own plugin-settings screen, which
+     * Craft keeps admin-only whatever this plugin grants. A form author with
+     * every Formable permission would otherwise follow the prompt to a 403, so
+     * they are told to ask an administrator instead.
+     *
+     * Craft renders plugin settings inside its `settings` input namespace, so
+     * the section's `formable-editions` id reaches the page prefixed.
+     */
+    public function getUpgradeUrl(): ?string
+    {
+        if (!Craft::$app->getUser()->getIsAdmin()) {
+            return null;
+        }
+
+        return UrlHelper::cpUrl('settings/plugins/formable') . '#settings-formable-editions';
+    }
+
+    /**
+     * The integration settings screen, or null when the current user may not
+     * open it - the builder's empty integrations state points there.
+     */
+    public function getIntegrationsUrl(): ?string
+    {
+        if (!Craft::$app->getUser()->checkPermission('formable:manageIntegrations')) {
+            return null;
+        }
+
+        return UrlHelper::cpUrl('formable/integrations');
     }
 
     public function init(): void

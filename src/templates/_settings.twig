@@ -8,7 +8,8 @@
  # licence-key field it renders around this settings page), so this section is
  # purely informational: the active edition, what each edition includes, and a
  # call-to-action into the Plugin Store. The upgrade prompts elsewhere in the CP
- # deep-link to the `#formable-editions` anchor below.
+ # deep-link to the anchor below through `Plugin::getUpgradeUrl()`. Craft
+ # namespaces this page's ids, so on the page it is `settings-formable-editions`.
  #}
 {% set proFeatures = [
     'Conditional logic (show/hide fields and pages by answer)'|t('formable'),
@@ -582,6 +583,15 @@
     size: 6,
     value: settings.submitRateLimitWindow,
     errors: settings.getErrors('submitRateLimitWindow'),
+}) }}
+
+{{ forms.lightswitchField({
+    label: 'Refresh Tokens on Cached Pages'|t('formable'),
+    instructions: 'When a page holding a form is served from a cache - Blitz, a CDN, a template cache - the form loads with another visitor’s security token and would be rejected on submit. With this on, the form fetches fresh ones as soon as the page loads, at the cost of one small request per page view. It needs JavaScript; a visitor without it still submits the token the page was cached with.'|t('formable'),
+    id: 'refreshCachedTokens',
+    name: 'refreshCachedTokens',
+    on: settings.refreshCachedTokens,
+    errors: settings.getErrors('refreshCachedTokens'),
 }) }}
 
 <hr>

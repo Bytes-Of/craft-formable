@@ -4,7 +4,11 @@
  # `craft.formable.renderForm()`'s own styles, this document carries:
  #
  # - a page background and padding, keyed to `--formable-surface-raised` by
- #   default so it repaints with whatever scheme the form itself is showing;
+ #   default so it repaints with whatever scheme the form itself is showing,
+ #   and a text colour keyed to `--formable-text` with it: below the default
+ #   theme the form inherits its text, and a host that paints a dark page
+ #   sets light text, or the `contract` and `reset` levels would print black
+ #   on it;
  #   `pageBackground: white` opts out of that, for `embed-light-host-dark-os`
  #   ([[frontend-embeddability-review]] chunk 1, step 3) - a real host page
  #   does not know or care what colour Formable's own tokens resolve to.
@@ -89,6 +93,7 @@ ul, ol { padding-left: 2rem; }',
             margin: 0;
             padding: 2rem;
             background: {{ pageBackground == 'white' ? '#fff' : 'var(--formable-surface-raised, #f4f4f5)' }};
+            color: {{ pageBackground == 'white' ? '#000' : 'var(--formable-text, #18181b)' }};
         }
         {% if width != 'full' %}
         [data-preview-target] {

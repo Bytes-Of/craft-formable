@@ -533,7 +533,7 @@ function fieldError(name: string): string | null {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-block-end: 12px;
 }
 
 .fb-notifs__list-title {
@@ -584,7 +584,7 @@ function fieldError(name: string): string | null {
   background: none;
   border: none;
   cursor: pointer;
-  text-align: left;
+  text-align: start;
   font: inherit;
 }
 
@@ -600,22 +600,22 @@ function fieldError(name: string): string | null {
   font-size: 11px;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-notifs__item-state--off {
-  color: #9aa5b1;
+  color: #606d7b;
 }
 
 .fb-notifs__item-remove {
   border: none;
-  border-left: 1px solid #e3e5e8;
+  border-inline-start: 1px solid #e3e5e8;
   background: none;
   cursor: pointer;
   padding: 0 10px;
   font-size: 18px;
   line-height: 1;
-  color: #9aa5b1;
+  color: #606d7b;
 }
 
 .fb-notifs__item-remove:hover {
@@ -625,7 +625,7 @@ function fieldError(name: string): string | null {
 .fb-notifs__editor--empty {
   color: #606d7b;
   font-size: 13px;
-  padding-top: 40px;
+  padding-block-start: 40px;
 }
 
 .fb-notifs__tokens {
@@ -659,9 +659,9 @@ function fieldError(name: string): string | null {
 }
 
 .fb-notifs__test-result {
-  margin-top: 8px;
+  margin-block-start: 8px;
   font-size: 13px;
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-notifs__test-result--error {
@@ -669,9 +669,9 @@ function fieldError(name: string): string | null {
 }
 
 .fb-notifs__log {
-  margin-top: 28px;
-  border-top: 1px solid #e3e5e8;
-  padding-top: 16px;
+  margin-block-start: 28px;
+  border-block-start: 1px solid #e3e5e8;
+  padding-block-start: 16px;
 }
 
 .fb-notifs__log-title {
@@ -688,9 +688,10 @@ function fieldError(name: string): string | null {
 
 .fb-notifs__log-table th,
 .fb-notifs__log-table td {
-  text-align: left;
-  padding: 6px 12px 6px 0;
-  border-bottom: 1px solid #eef0f2;
+  text-align: start;
+  padding-block: 6px;
+  padding-inline: 0 12px;
+  border-block-end: 1px solid #eef0f2;
   vertical-align: top;
 }
 
@@ -700,7 +701,7 @@ function fieldError(name: string): string | null {
 }
 
 .fb-notifs__log-status--ok {
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-notifs__log-status--fail {
@@ -708,15 +709,15 @@ function fieldError(name: string): string | null {
 }
 
 .fb-notifs__log-table .fb-notifs__log-action {
-  padding-right: 0;
-  text-align: right;
+  padding-inline-end: 0;
+  text-align: end;
   white-space: nowrap;
 }
 
 .fb-notifs__resend-result {
   margin: 0 0 12px;
   font-size: 13px;
-  color: #3f9142;
+  color: #2e7d32;
 }
 
 .fb-notifs__resend-result--error {

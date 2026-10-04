@@ -18,6 +18,10 @@ use GraphQL\Type\Definition\ResolveInfo;
  * caller’s arguments so a `form`/`formId` argument can only ever narrow within
  * the granted set, never past it.
  *
+ * Within that set, a query answers with completed, non-spam submissions unless
+ * it says otherwise - see {@see applyDocumentedDefaults()}, which is where that
+ * default is actually applied.
+ *
  * @internal
  */
 final class SubmissionResolver extends BaseResolver
@@ -68,8 +72,42 @@ final class SubmissionResolver extends BaseResolver
 
         $query = Submission::find();
         self::applyArguments($query, $arguments);
+        self::applyDocumentedDefaults($query, $arguments);
         $query->andWhere(['formable_submissions.formId' => $allowedFormIds]);
 
         return $query;
+    }
+
+    /**
+     * Narrows to completed, non-spam submissions unless the caller said
+     * otherwise - the default the two arguments document.
+     *
+     * `SubmissionQuery`'s own defaults stand aside for a query that names ids
+     * or uids ([[0129-a-lookup-by-id-sees-every-submission]]), so the narrowing
+     * has to be asked for here. It cannot be left to the argument declarations:
+     * graphql-php materialises an omitted argument only where the definition
+     * carries a `defaultValue`, and an absent argument never reaches
+     * {@see applyArguments()}. Without this, `formableSubmission(id: ...)` on
+     * any schema with submission read scope answered with spam and part-filled
+     * drafts, answers and all.
+     *
+     * A null is read as the default rather than as a request for both, which is
+     * what an omitted argument and an explicit `isSpam: null` both did before
+     * 0129 - there is no documented way to ask for both at once.
+     *
+     * [[0131-graphql-submission-defaults-are-named-by-the-resolver]]
+     *
+     * @param SubmissionQuery<int, Submission> $query
+     * @param array<string, mixed> $arguments
+     */
+    private static function applyDocumentedDefaults(SubmissionQuery $query, array $arguments): void
+    {
+        if (($arguments['isSpam'] ?? null) === null) {
+            $query->isSpam(false);
+        }
+
+        if (($arguments['isIncomplete'] ?? null) === null) {
+            $query->isIncomplete(false);
+        }
     }
 }

@@ -38,7 +38,7 @@
     {% endif %}
 
     {% if spam.timeToken %}
-        <input type="hidden" name="{{ spam.timeField }}" value="{{ spam.timeToken }}">
+        <input type="hidden" name="{{ spam.timeField }}" value="{{ spam.timeToken }}" data-formable-time-token>
     {% endif %}
 
     {% if spam.jsField %}

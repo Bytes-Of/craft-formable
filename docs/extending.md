@@ -65,6 +65,38 @@ Event::on(
 );
 ```
 
+Rejecting shows the visitor an error. To stop a submission quietly instead -
+the right call for a spam check, since telling a bot it was caught only helps
+it adapt - mark it as spam.
+
+### Example - mark a submission as spam
+
+```php
+use bytesof\formable\services\Submissions;
+use bytesof\formable\events\SubmissionEvent;
+use yii\base\Event;
+
+Event::on(
+    Submissions::class,
+    Submissions::EVENT_BEFORE_SUBMIT,
+    function (SubmissionEvent $event) {
+        if (MySpamService::isSpam($event->submission)) {
+            $event->submission->isSpam = true;
+            $event->submission->spamReason = 'Blocked by MySpamService';
+        }
+    },
+);
+```
+
+A submission marked this way is handled exactly like one Formable's own checks
+caught. The visitor sees the ordinary success response, and the form's **When
+Spam Is Detected** setting decides whether it is kept in the Spam queue or
+discarded. No notification is sent, no integration receives it, and
+`EVENT_AFTER_SUBMIT` does not fire; `EVENT_SUBMISSION_ERROR` fires with the
+`spam` reason, as it does for any spam. Formable's built-in checks are skipped
+for it. The `spamReason` text (up to 255 characters) is shown as written in the
+control panel.
+
 ## Custom field types
 
 Register the class, then implement it by extending the appropriate base in

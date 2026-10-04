@@ -750,6 +750,24 @@ final class PreviewScenarios
     }
 
     /**
+     * Whether a scenario settles its own colour scheme, so the frame's
+     * `scheme` toggle must not reach the form.
+     *
+     * A scenario pins one in two ways: a `colorScheme` render option (the
+     * Colour scheme and Palette groups), or a `scheme` preview default, which
+     * is how `embed-light-host-dark-os` and its kin simulate a dark-forced
+     * ancestor around a form that keeps its own scheme. Every other scenario
+     * is scheme-neutral, and the frame shows it in whichever scheme it is
+     * asked for.
+     *
+     * @param array<string, mixed> $scenario
+     */
+    public static function pinsScheme(array $scenario): bool
+    {
+        return isset($scenario['options']['colorScheme']) || isset($scenario['previewDefaults']['scheme']);
+    }
+
+    /**
      * @return array<int, array<string, string>>
      */
     private static function options(string ...$labels): array

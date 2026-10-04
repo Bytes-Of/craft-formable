@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted } from 'vue';
+import { computed, onBeforeUnmount, onMounted, watch } from 'vue';
 import { useBuilderStore, type BuilderTab } from '../stores/builder';
 import { openPreview } from '../api';
-import { t } from '../helpers';
+import { camelize, t } from '../helpers';
 import BuilderCanvas from './BuilderCanvas.vue';
 import DraftBanner from './DraftBanner.vue';
 import FieldPalette from './FieldPalette.vue';
@@ -26,12 +26,36 @@ const tabs: { id: BuilderTab; label: string }[] = [
 const titleError = computed(() => store.formErrors.title?.[0] ?? null);
 const handleError = computed(() => store.formErrors.handle?.[0] ?? null);
 
+/**
+ * The handle follows the title while it still reads as derived from it, so
+ * authors who don't know what a handle is get a usable one without touching
+ * the input. Typing a handle by hand stops the derivation - comparing against
+ * the previous title rather than holding a "touched" flag keeps that decision
+ * intact when a restored draft or an undo swaps the whole form state out.
+ *
+ * A saved form's handle is what templates pass to `craft.formable.form()`, so
+ * renaming the title of one never moves it.
+ */
+watch(
+  () => store.form.title,
+  (title, previousTitle) => {
+    if (
+      store.form.id !== null ||
+      store.form.handle !== camelize(previousTitle)
+    ) {
+      return;
+    }
+
+    store.form.handle = camelize(title);
+  },
+);
+
 const statusLabel = computed(() => {
   switch (store.saveStatus) {
     case 'saving':
       return t('Saving…');
     case 'saved':
-      return t('Saved');
+      return store.saveMessage || t('Saved');
     case 'error':
       return store.saveMessage;
     default:

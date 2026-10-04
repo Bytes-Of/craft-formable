@@ -13,7 +13,8 @@ defineProps<{ feature: string }>();
 
 const store = useBuilderStore();
 // Deep-links to the plugin settings' Editions section so every Lite prompt
-// lands on the same upgrade surface.
+// lands on the same upgrade surface. Empty for anyone who isn't an admin:
+// Craft keeps that screen admin-only, so they are pointed at a person instead.
 const upgradeUrl = computed<string>(() => store.upgradeUrl);
 </script>
 
@@ -29,6 +30,9 @@ const upgradeUrl = computed<string>(() => store.upgradeUrl);
     <a v-if="upgradeUrl" class="fb-upgrade__link" :href="upgradeUrl">{{
       t('Upgrade to Pro')
     }}</a>
+    <span v-else class="fb-upgrade__link">{{
+      t('Ask an administrator to upgrade.')
+    }}</span>
   </div>
 </template>
 
@@ -43,7 +47,7 @@ const upgradeUrl = computed<string>(() => store.upgradeUrl);
   border-radius: 5px;
   padding: 10px 14px;
   font-size: 13px;
-  margin-bottom: 16px;
+  margin-block-end: 16px;
 }
 
 .fb-upgrade__pill {
@@ -51,7 +55,9 @@ const upgradeUrl = computed<string>(() => store.upgradeUrl);
   padding: 1px 7px;
   border-radius: 9px;
   background: #f3d072;
-  color: #7a5b00;
+
+  /* 5.5:1 on the pill: the 11px label needs AA's 4.5:1, and #7a5b00 gave 4.2. */
+  color: #664b00;
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
@@ -59,7 +65,7 @@ const upgradeUrl = computed<string>(() => store.upgradeUrl);
 }
 
 .fb-upgrade__link {
-  margin-left: auto;
+  margin-inline-start: auto;
   font-weight: 600;
   white-space: nowrap;
 }

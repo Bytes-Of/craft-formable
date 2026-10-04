@@ -315,6 +315,25 @@ final class Settings extends Model
     public int $submitRateLimitWindow = 600;
 
     /**
+     * Whether a rendered form asks the server for fresh request-scoped values
+     * once the page has loaded - the CSRF token, the spam time token and the
+     * flow id - so a page served from a static cache (Blitz, a CDN, a `{% cache
+     * %}` block) still submits.
+     *
+     * Those three are baked into the markup at render time, and a cached copy
+     * hands every later visitor the first visitor's values: a CSRF token that
+     * belongs to someone else's session is a hard 400 on submit. On by default
+     * because that failure is only ever discovered as lost leads.
+     *
+     * The cost is one small request per page view that holds a form. On a
+     * cached page that request is also what starts the visitor's session, so a
+     * CDN rule that varies on cookies will see traffic it did not before. Turn
+     * it off for forms that are never cached, or where the CSRF token is
+     * already refreshed another way.
+     */
+    public bool $refreshCachedTokens = true;
+
+    /**
      * Per-provider credentials. A captcha renders and verifies only once both
      * its keys are set, so an empty pair simply means "not configured" - the
      * secret keys accept `$VAR` env references like every other Craft secret.
@@ -456,6 +475,7 @@ final class Settings extends Model
             [['rateLimitWindow'], 'integer', 'min' => 1],
             [['submitRateLimitMax'], 'integer', 'min' => 0],
             [['submitRateLimitWindow'], 'integer', 'min' => 1],
+            [['refreshCachedTokens'], 'boolean'],
             [['deleteUploadsWithSubmissions'], 'boolean'],
             [['deliveryLogRetentionDays'], 'integer', 'min' => 0],
             [

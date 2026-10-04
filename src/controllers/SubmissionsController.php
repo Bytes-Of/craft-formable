@@ -46,8 +46,15 @@ use yii\web\Response;
  */
 final class SubmissionsController extends Controller
 {
+    /**
+     * The most flow ids one refresh may ask for. A page holds a handful of forms,
+     * so this bounds the work of a hostile `flows` value without ever refusing a
+     * real one.
+     */
+    private const MAX_FLOW_IDS = 20;
+
     /** @var array<int, string>|int|bool */
-    protected array|int|bool $allowAnonymous = ['submit', 'resume'];
+    protected array|int|bool $allowAnonymous = ['submit', 'resume', 'tokens'];
 
     public function actionSubmit(): ?Response
     {
@@ -123,6 +130,45 @@ final class SubmissionsController extends Controller
     }
 
     /**
+     * Fresh request-scoped values for a form rendered onto a cached page.
+     *
+     * A cached page carries the CSRF token, time token and flow id of whoever
+     * rendered it. The front end fetches new ones here and writes them over the
+     * baked ones. A GET, because a POST would need a CSRF token to mint one.
+     *
+     * Not rate limited: the work is one HMAC and a few random strings, and an IP
+     * bucket would throttle every visitor behind one CDN or NAT address at once.
+     * A limiter that failed success-shaped would also return no tokens and claim
+     * success, quietly reinstating the bug this exists to fix.
+     */
+    public function actionTokens(): Response
+    {
+        $this->requireAcceptsJson();
+
+        // Load-bearing: a CDN is otherwise entitled to cache a GET, which would
+        // serve one visitor's CSRF token to the next.
+        $this->response->setNoCacheHeaders();
+
+        $requested = (int)$this->request->getQueryParam('flows', 0);
+        $count = min(max($requested, 0), self::MAX_FLOW_IDS);
+
+        $progress = Plugin::getInstance()->getProgress();
+        $flowIds = [];
+
+        for ($i = 0; $i < $count; $i++) {
+            $flowIds[] = $progress->newFlowId();
+        }
+
+        return $this->asJson([
+            'success' => true,
+            'csrfTokenName' => $this->request->csrfParam,
+            'csrfToken' => $this->request->getCsrfToken(),
+            'timeToken' => Plugin::getInstance()->getSpam()->createTimeToken(),
+            'flowIds' => $flowIds,
+        ]);
+    }
+
+    /**
      * Opens a saved form from a resume link.
      *
      * The token is the whole credential, so a bad or expired one 404s rather
@@ -138,7 +184,10 @@ final class SubmissionsController extends Controller
         }
 
         $handle = $this->request->getRequiredParam('form');
-        $token = $this->request->getRequiredParam('token');
+        // A link sent before 1.1 carries `token`. It only ever reached here on
+        // a site that renamed Craft's own `tokenParam`, and there it still
+        // should for as long as the link is valid.
+        $token = $this->request->getParam('resumeToken') ?? $this->request->getRequiredParam('token');
 
         $form = Plugin::getInstance()->getForms()->getFormByHandle(is_string($handle) ? $handle : '');
 
@@ -152,6 +201,13 @@ final class SubmissionsController extends Controller
         );
 
         if ($submission === null) {
+            // Finishing a resumed form without JavaScript redirects back to
+            // its link, whose token no longer finds an unfinished submission.
+            // The success flash is only ever set in this visitor's session.
+            if (Craft::$app->getSession()->hasFlash(Rendering::SUCCESS_FLASH_PREFIX . $form->handle)) {
+                return $this->renderResumedForm($form, null, null);
+            }
+
             throw new NotFoundHttpException('This link has expired or is no longer valid.');
         }
 
@@ -233,7 +289,7 @@ final class SubmissionsController extends Controller
 
         Craft::$app->getSession()->setNotice(Craft::t('formable', 'Submission updated.'));
 
-        return $this->redirectToPostedUrl($submission);
+        return $this->redirectToPostedUrl($submission, $this->postingPageUrl());
     }
 
     /**
@@ -256,7 +312,7 @@ final class SubmissionsController extends Controller
 
         Craft::$app->getSession()->setNotice(Craft::t('formable', 'Submission deleted.'));
 
-        return $this->redirectToPostedUrl();
+        return $this->redirectToPostedUrl(null, $this->postingPageUrl());
     }
 
     /**
@@ -410,7 +466,7 @@ final class SubmissionsController extends Controller
         return match ($result->status) {
             FlowResult::ADVANCED => $this->respondAdvanced($form, $result),
             FlowResult::COMPLETED => $this->respondCompleted($form, $result, $settings),
-            FlowResult::SAVED => $this->respondSaved($result),
+            FlowResult::SAVED => $this->respondSaved($form, $result),
             FlowResult::SAVE_FAILED => $this->respondSaveError($result),
             // A form that cannot be saved for later has no save control to
             // press, so a save reaching here is a hand-rolled post rather than
@@ -504,7 +560,7 @@ final class SubmissionsController extends Controller
             );
         }
 
-        return $this->redirectToPostedUrl($submission);
+        return $this->redirectToPostedUrl($submission, $this->postingPageUrl());
     }
 
     private function respondInvalid(Form $form, FlowResult $result): ?Response
@@ -530,7 +586,7 @@ final class SubmissionsController extends Controller
         return null;
     }
 
-    private function respondSaved(FlowResult $result): Response
+    private function respondSaved(Form $form, FlowResult $result): Response
     {
         $message = (string)$result->message;
 
@@ -542,7 +598,10 @@ final class SubmissionsController extends Controller
             ]);
         }
 
-        Craft::$app->getSession()->setNotice($message);
+        // Under the form's own handle, like a completion's message: Craft's
+        // generic `notice` is one the form renderer never prints, so a theme
+        // that doesn't print it either reloaded with no sign the email went.
+        Craft::$app->getSession()->setFlash(Rendering::SAVED_FLASH_PREFIX . $form->handle, $message);
 
         return $this->redirectToStep($result->page);
     }
@@ -592,9 +651,9 @@ final class SubmissionsController extends Controller
 
     /**
      * Renders a resumed form as a standalone page, at the point the submitter
-     * left off.
+     * left off, or, with no submission, the success state of one just finished.
      */
-    private function renderResumedForm(Form $form, Submission $submission, string $flowId): Response
+    private function renderResumedForm(Form $form, ?Submission $submission, ?string $flowId): Response
     {
         $view = Craft::$app->getView();
         $this->response->data = $view->renderPageTemplate(
@@ -602,7 +661,7 @@ final class SubmissionsController extends Controller
             [
                 'form' => $form,
                 'submission' => $submission,
-                'page' => $submission->pageIndex,
+                'page' => $submission?->pageIndex,
                 'flowId' => $flowId,
             ],
             View::TEMPLATE_MODE_SITE,
@@ -624,9 +683,21 @@ final class SubmissionsController extends Controller
         ]);
     }
 
+    /**
+     * Where a non-JS post goes back to when it names no `redirect` of its own.
+     *
+     * Craft's fallback is the bare path info, which drops the query string. A
+     * page that picks its form by query parameter then renders a different
+     * form, or none, and the success message flashed for this one is lost.
+     */
+    private function postingPageUrl(): string
+    {
+        return $this->request->getReferrer() ?? $this->request->getUrl();
+    }
+
     private function redirectToStep(int $page, bool $review = false): Response
     {
-        $url = $this->request->getReferrer() ?? $this->request->getUrl();
+        $url = $this->postingPageUrl();
         $params = ['formablePage' => $page];
 
         // Carry the flow id back onto the URL the non-JS path reloads, so the
